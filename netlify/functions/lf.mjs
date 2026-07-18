@@ -117,7 +117,8 @@ export default async (req) => {
         passphraseHash: hashPass(passphrase, salt),
         teachers: {},
         sow: { data: null, updatedAt: null },
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        archived: false
       };
       await saveGroup(group);
       const token = genToken();
@@ -179,7 +180,10 @@ export default async (req) => {
       return json(200, { active: !settings.paywallEnabled });
     }
     if (method === 'GET' && parts[0] === 'billing' && parts[1] === 'plans') {
-      return json(200, []);
+      return json(200, [
+        { id: 'termly', name: 'Termly', description: 'Billed each term, cancel any time', price: 15, period: '/ term' },
+        { id: 'annual', name: 'Annual (Academic Year)', description: 'One payment for the whole academic year — best value', price: 30, period: '/ year' }
+      ]);
     }
     if (method === 'POST' && parts[0] === 'billing' && parts[1] === 'checkout') {
       return json(400, { error: 'Billing is not set up yet, your account is free for now.' });
@@ -210,12 +214,28 @@ export default async (req) => {
             hodName: g.hodName,
             teacherCount: teachers.length,
             createdAt: g.createdAt,
-            lastActivity: Math.max(...activityTimes)
+            lastActivity: Math.max(...activityTimes),
+            archived: !!g.archived
           });
         }
         groups.sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
-        const totalTeachers = groups.reduce((sum, g) => sum + g.teacherCount, 0);
-        return json(200, { totalGroups: groups.length, totalTeachers, groups });
+        const active = groups.filter(g => !g.archived);
+        const totalTeachers = active.reduce((sum, g) => sum + g.teacherCount, 0);
+        return json(200, {
+          totalGroups: active.length,
+          totalTeachers,
+          archivedGroups: groups.length - active.length,
+          groups
+        });
+      }
+
+      if (method === 'PUT' && parts[1] === 'groups' && parts[3] === 'archive' && parts.length === 4) {
+        const code = parts[2].toUpperCase();
+        const g = await getGroup(code);
+        if (!g) return json(404, { error: 'Group not found.' });
+        g.archived = !!body.archived;
+        await saveGroup(g);
+        return json(200, { code: g.code, archived: g.archived });
       }
 
       if (parts[1] === 'settings' && parts.length === 2) {
