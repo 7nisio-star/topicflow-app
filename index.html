@@ -1210,7 +1210,7 @@ function validateCls(arr){
   });
 }
 // ↓ Edit this date before distributing to set expiry (null = never expires)
-const APP_LICENCE_EXPIRY='2026-07-31';
+const APP_LICENCE_EXPIRY=null;
 const APP_EXPIRES=APP_LICENCE_EXPIRY;
 
 function checkExpiry(){
@@ -6395,7 +6395,7 @@ function renderSetup(){
           <button onclick="navigator.clipboard.writeText('${esc(SETUP_DATA.joinCode)}').then(()=>showToast('Join code copied!')).catch(()=>{})" class="btna btn" style="font-size:12px;padding:6px 16px;margin-top:8px;">📋 Copy code</button>
         </div>
         <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.6;">
-          Teachers enter this code at <strong style="color:var(--text);">lessonflow.io</strong> → "I'm a Teacher" to join your department.
+          Teachers enter this code at <strong style="color:var(--text);">${esc(location.host)}</strong> → "Teacher" to join your department.
         </div>
         <div class="setup-nav">
           <button class="sbtn-next" onclick="SETUP_STEP=2;renderSetup()">Set up AI &amp; curriculum →</button>
