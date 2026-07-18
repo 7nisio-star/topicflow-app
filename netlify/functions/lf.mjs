@@ -22,7 +22,7 @@ const PLAN_PRICES = {
 };
 
 async function getBilling(code) {
-  const b = await BILLING().get(code.toUpperCase(), { type: 'json' });
+  const b = await BILLING().get(code.toUpperCase(), { type: 'json', consistency: 'strong' });
   return b || { plan: null, paidUntil: 0 };
 }
 async function saveBilling(code, rec) {
@@ -51,15 +51,22 @@ function hashPass(pass, salt) {
   return crypto.scryptSync(pass, salt, 64).toString('hex');
 }
 
+// Group records get read-then-modified-then-written from multiple actors
+// (HoD and several teachers, often within seconds of each other — e.g. two
+// teachers saving progress, or a teacher joining right after the HoD sets
+// the SoW). Netlify Blobs' default reads are eventually consistent, which
+// showed up during testing as a genuine lost update: a stale read silently
+// overwrote another teacher's just-saved data. Forcing strong consistency
+// on every read that precedes a write closes that window.
 async function getGroup(code) {
-  return await GROUPS().get(code.toUpperCase(), { type: 'json' });
+  return await GROUPS().get(code.toUpperCase(), { type: 'json', consistency: 'strong' });
 }
 async function saveGroup(g) {
   await GROUPS().setJSON(g.code, g);
 }
 async function getTokenRecord(tok) {
   if (!tok) return null;
-  return await TOKENS().get(tok, { type: 'json' });
+  return await TOKENS().get(tok, { type: 'json', consistency: 'strong' });
 }
 async function saveTokenRecord(tok, rec) {
   await TOKENS().setJSON(tok, rec);
@@ -89,7 +96,7 @@ async function allow(req, bucket, limit, windowMs) {
 }
 
 async function getSettings() {
-  const s = await SETTINGS().get('global', { type: 'json' });
+  const s = await SETTINGS().get('global', { type: 'json', consistency: 'strong' });
   return s || { paywallEnabled: false };
 }
 async function saveSettings(s) {
