@@ -1,10 +1,33 @@
 import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
+import Stripe from 'stripe';
 
 const GROUPS = () => getStore('lf-groups');
 const TOKENS = () => getStore('lf-tokens');
 const RATE = () => getStore('lf-ratelimit');
 const SETTINGS = () => getStore('lf-settings');
+const BILLING = () => getStore('lf-billing');
+
+function stripeClient() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  return key ? new Stripe(key) : null;
+}
+
+// One-time payments, not Stripe subscriptions — school terms don't line up
+// with fixed monthly billing cycles, so "termly"/"annual" just grant access
+// for a fixed window from the moment of payment.
+const PLAN_PRICES = {
+  termly: { amount: 1500, name: 'TopicFlow — Termly', days: 120 },
+  annual: { amount: 3000, name: 'TopicFlow — Annual (Academic Year)', days: 365 }
+};
+
+async function getBilling(code) {
+  const b = await BILLING().get(code.toUpperCase(), { type: 'json' });
+  return b || { plan: null, paidUntil: 0 };
+}
+async function saveBilling(code, rec) {
+  await BILLING().setJSON(code.toUpperCase(), rec);
+}
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -89,6 +112,37 @@ export default async (req) => {
     const url = new URL(req.url);
     let path = url.pathname.replace(/^\/api\/lf/, '');
     if (!path) path = '/';
+
+    // Stripe webhook needs the raw request body for signature verification,
+    // so it must be handled before the generic req.json() parse below (which
+    // would otherwise consume the stream).
+    if (req.method === 'POST' && path === '/billing/webhook') {
+      const stripe = stripeClient();
+      const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!stripe || !whSecret) return json(400, { error: 'Webhook not configured.' });
+      const sig = req.headers.get('stripe-signature');
+      const raw = await req.text();
+      let event;
+      try {
+        event = stripe.webhooks.constructEvent(raw, sig, whSecret);
+      } catch (e) {
+        return json(400, { error: 'Invalid signature.' });
+      }
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        const code = session.metadata && session.metadata.groupCode;
+        const planId = session.metadata && session.metadata.planId;
+        const plan = PLAN_PRICES[planId];
+        if (code && plan && session.payment_status === 'paid') {
+          const existing = await getBilling(code);
+          const base = Math.max(existing.paidUntil || 0, Date.now());
+          const paidUntil = base + plan.days * 24 * 60 * 60 * 1000;
+          await saveBilling(code, { plan: planId, paidUntil, updatedAt: Date.now(), lastSessionId: session.id });
+        }
+      }
+      return json(200, { received: true });
+    }
+
     const method = req.method;
     const parts = path.split('/').filter(Boolean);
     let body = {};
@@ -177,16 +231,52 @@ export default async (req) => {
 
     if (method === 'GET' && parts[0] === 'billing' && parts[1] === 'status') {
       const settings = await getSettings();
-      return json(200, { active: !settings.paywallEnabled });
+      if (!settings.paywallEnabled) return json(200, { active: true });
+      const code = parts[2];
+      if (!code) return json(200, { active: true });
+      const billing = await getBilling(code);
+      const active = (billing.paidUntil || 0) > Date.now();
+      return json(200, { active, plan: billing.plan || null, paidUntil: billing.paidUntil || null });
     }
     if (method === 'GET' && parts[0] === 'billing' && parts[1] === 'plans') {
       return json(200, [
-        { id: 'termly', name: 'Termly', description: 'Billed each term, cancel any time', price: 15, period: '/ term' },
+        { id: 'termly', name: 'Termly', description: 'One payment, covers roughly a term', price: 15, period: '/ term' },
         { id: 'annual', name: 'Annual (Academic Year)', description: 'One payment for the whole academic year — best value', price: 30, period: '/ year' }
       ]);
     }
     if (method === 'POST' && parts[0] === 'billing' && parts[1] === 'checkout') {
-      return json(400, { error: 'Billing is not set up yet, your account is free for now.' });
+      if (!(await allow(req, 'checkout', 20, 10 * 60 * 1000))) {
+        return json(429, { error: 'Too many attempts. Please wait a few minutes and try again.' });
+      }
+      const stripe = stripeClient();
+      if (!stripe) return json(400, { error: 'Billing is not set up yet, your account is free for now.' });
+      const planId = body.planId;
+      const groupCode = (body.groupCode || '').toUpperCase();
+      const plan = PLAN_PRICES[planId];
+      if (!plan) return json(400, { error: 'Unknown plan.' });
+      const group = await getGroup(groupCode);
+      if (!group) return json(404, { error: 'Group not found.' });
+      const origin = req.headers.get('origin') || ('https://' + url.host);
+      try {
+        const session = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          line_items: [{
+            price_data: {
+              currency: 'gbp',
+              unit_amount: plan.amount,
+              product_data: { name: plan.name + ' — ' + group.hodName }
+            },
+            quantity: 1
+          }],
+          metadata: { groupCode, planId },
+          success_url: origin + '/?billing=success&code=' + groupCode,
+          cancel_url: origin + '/?billing=cancel'
+        });
+        return json(200, { checkoutUrl: session.url, checkoutId: session.id });
+      } catch (e) {
+        return json(500, { error: 'Could not start checkout: ' + (e && e.message ? e.message : 'unknown error') });
+      }
     }
 
     // ── Admin routes (protected by x-admin-key header) ──
@@ -209,13 +299,16 @@ export default async (req) => {
             (g.sow && g.sow.updatedAt) || 0,
             ...teachers.map(t => t.updatedAt || 0)
           ];
+          const billing = await getBilling(g.code);
           groups.push({
             code: g.code,
             hodName: g.hodName,
             teacherCount: teachers.length,
             createdAt: g.createdAt,
             lastActivity: Math.max(...activityTimes),
-            archived: !!g.archived
+            archived: !!g.archived,
+            plan: billing.plan || null,
+            paidUntil: billing.paidUntil || null
           });
         }
         groups.sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
