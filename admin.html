@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>TopicFlow — Admin</title>
+<style>
+  :root{
+    --bg:#0f1117; --panel:#171a24; --panel2:#1d2130; --border:rgba(124,99,248,.25);
+    --text:#f2f3f7; --text2:#aab0c6; --text3:#6b7288;
+    --acc:#7c63f8; --acc2:#4fd1a5; --red:#ff5c7a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:var(--bg); color:var(--text); min-height:100vh;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:40px 20px 80px;}
+  .logo{font-size:20px;font-weight:700;margin-bottom:4px;}
+  .logo span{color:var(--acc2);}
+  .sub{color:var(--text3);font-size:13px;margin-bottom:32px;}
+
+  /* Gate */
+  #gate{max-width:360px;margin:80px auto;text-align:center;}
+  #gate input{
+    width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);
+    background:var(--panel);color:var(--text);font-size:14px;margin:16px 0 10px;
+  }
+  #gate button, .btn{
+    width:100%;padding:12px 14px;border-radius:10px;border:none;
+    background:var(--acc);color:#fff;font-weight:600;font-size:14px;cursor:pointer;
+  }
+  #gate button:hover, .btn:hover{filter:brightness(1.08);}
+  #gate .err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px;}
+  .remember{display:flex;align-items:center;gap:6px;justify-content:center;color:var(--text3);font-size:12px;margin-top:10px;}
+
+  /* Dashboard */
+  #dash{display:none;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:28px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;}
+  .card .n{font-size:28px;font-weight:700;}
+  .card .l{color:var(--text3);font-size:12px;margin-top:4px;}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
+  .panel h2{font-size:15px;margin:0 0 4px;}
+  .panel .desc{color:var(--text3);font-size:12px;margin-bottom:16px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;color:var(--text3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;padding:8px 10px;border-bottom:1px solid var(--border);}
+  td{padding:10px;border-bottom:1px solid rgba(255,255,255,.05);}
+  tr:last-child td{border-bottom:none;}
+  .code{font-family:monospace;background:var(--panel2);padding:2px 6px;border-radius:6px;letter-spacing:.05em;}
+  .empty{color:var(--text3);font-size:13px;text-align:center;padding:24px 0;}
+
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+  .switch{position:relative;width:46px;height:26px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;inset:0;background:#31364a;border-radius:26px;cursor:pointer;transition:.2s;}
+  .slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+  .switch input:checked + .slider{background:var(--acc);}
+  .switch input:checked + .slider:before{transform:translateX(20px);}
+  .status-msg{font-size:12px;color:var(--acc2);margin-top:10px;min-height:14px;}
+
+  .refresh{background:none;border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;}
+  .refresh:hover{color:var(--text);}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+  .loading{color:var(--text3);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">Topic<span>Flow</span> — Admin</div>
+  <div class="sub">Internal dashboard. Not linked from the app.</div>
+
+  <div id="gate">
+    <div class="panel">
+      <h2>Enter admin key</h2>
+      <div class="desc">Set via the ADMIN_KEY environment variable in Netlify.</div>
+      <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off">
+      <button class="btn" onclick="unlock()">Unlock</button>
+      <div class="err" id="gate-err"></div>
+      <label class="remember"><input type="checkbox" id="remember" checked style="width:auto;"> Remember on this device</label>
+    </div>
+  </div>
+
+  <div id="dash">
+    <div class="topbar">
+      <div class="loading" id="last-refreshed"></div>
+      <button class="refresh" onclick="loadStats()">↻ Refresh</button>
+    </div>
+
+    <div class="cards">
+      <div class="card"><div class="n" id="stat-groups">–</div><div class="l">Departments</div></div>
+      <div class="card"><div class="n" id="stat-teachers">–</div><div class="l">Teachers</div></div>
+      <div class="card"><div class="n" id="stat-cap">–</div><div class="l">Of ~200 teacher capacity</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>Departments</h2>
+      <div class="desc">Every group created so far, most recently active first.</div>
+      <div id="groups-table"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Paywall</h2>
+      <div class="desc">Toggle on to show every HoD an "upgrade" banner and block the free pass. Checkout isn't wired to a real payment provider yet, so turn this on only once billing is ready.</div>
+      <div class="toggle-row">
+        <div>Paywall enabled</div>
+        <label class="switch">
+          <input type="checkbox" id="paywall-toggle" onchange="togglePaywall()">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="status-msg" id="paywall-msg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY_STORAGE = 'lf_admin_key';
+let ADMIN_KEY = '';
+
+function fmtDate(ts){
+  if(!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+}
+
+async function api(path, opts){
+  const res = await fetch('/api/lf/admin' + path, Object.assign({
+    headers: Object.assign({'x-admin-key': ADMIN_KEY, 'Content-Type':'application/json'}, (opts&&opts.headers)||{})
+  }, opts||{}));
+  if(!res.ok){
+    const e = await res.json().catch(()=>({error:'Request failed ('+res.status+')'}));
+    throw new Error(e.error || 'Request failed');
+  }
+  return res.json();
+}
+
+async function unlock(){
+  const key = document.getElementById('admin-key').value.trim();
+  const errEl = document.getElementById('gate-err');
+  errEl.textContent = '';
+  if(!key){ errEl.textContent = 'Enter your admin key.'; return; }
+  ADMIN_KEY = key;
+  try{
+    await api('/settings');
+    if(document.getElementById('remember').checked){
+      localStorage.setItem(KEY_STORAGE, key);
+    }
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('dash').style.display = 'block';
+    loadStats();
+    loadSettings();
+  }catch(e){
+    errEl.textContent = 'Invalid admin key.';
+  }
+}
+
+async function loadStats(){
+  const tableEl = document.getElementById('groups-table');
+  document.getElementById('last-refreshed').textContent = 'Loading…';
+  try{
+    const data = await api('/stats');
+    document.getElementById('stat-groups').textContent = data.totalGroups;
+    document.getElementById('stat-teachers').textContent = data.totalTeachers;
+    document.getElementById('stat-cap').textContent = Math.round((data.totalTeachers/200)*100) + '%';
+    if(!data.groups.length){
+      tableEl.innerHTML = '<div class="empty">No departments yet.</div>';
+    } else {
+      tableEl.innerHTML = `<table><thead><tr>
+        <th>HoD</th><th>Join code</th><th>Teachers</th><th>Created</th><th>Last activity</th>
+      </tr></thead><tbody>` + data.groups.map(g => `
+        <tr>
+          <td>${escapeHtml(g.hodName||'—')}</td>
+          <td><span class="code">${escapeHtml(g.code)}</span></td>
+          <td>${g.teacherCount}</td>
+          <td>${fmtDate(g.createdAt)}</td>
+          <td>${fmtDate(g.lastActivity)}</td>
+        </tr>`).join('') + `</tbody></table>`;
+    }
+    document.getElementById('last-refreshed').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  }catch(e){
+    document.getElementById('last-refreshed').textContent = '';
+    tableEl.innerHTML = '<div class="empty">Could not load stats: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function loadSettings(){
+  try{
+    const s = await api('/settings');
+    document.getElementById('paywall-toggle').checked = !!s.paywallEnabled;
+  }catch(e){}
+}
+
+async function togglePaywall(){
+  const checked = document.getElementById('paywall-toggle').checked;
+  const msg = document.getElementById('paywall-msg');
+  msg.textContent = 'Saving…';
+  try{
+    await api('/settings', { method:'PUT', body: JSON.stringify({ paywallEnabled: checked }) });
+    msg.textContent = checked ? 'Paywall is ON — HoDs will see the upgrade banner.' : 'Paywall is OFF — everyone has free access.';
+  }catch(e){
+    msg.textContent = 'Failed to save: ' + e.message;
+    document.getElementById('paywall-toggle').checked = !checked;
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Auto-unlock if a key is remembered
+(function(){
+  const saved = localStorage.getItem(KEY_STORAGE);
+  if(saved){
+    document.getElementById('admin-key').value = saved;
+    unlock();
+  }
+})();
+</script>
+</body>
+</html>
