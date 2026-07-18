@@ -6400,6 +6400,29 @@ function renderSetup(){
         <div class="setup-nav">
           <button class="sbtn-next" onclick="SETUP_STEP=2;renderSetup()">Set up AI &amp; curriculum →</button>
         </div>`;
+    } else if(SETUP_DATA.hodMode==='login'){
+      bodyHTML=`
+        <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Sign back in</h2>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:20px;">Enter your department's join code and your passphrase.</p>
+        ${err}
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Join code</label>
+          <input class="sfield" id="hod-login-code" placeholder="e.g. ABC123" maxlength="6"
+            value="${esc(SETUP_DATA.hodLoginCode||'')}" oninput="SETUP_DATA.hodLoginCode=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);this.value=SETUP_DATA.hodLoginCode"
+            style="width:100%">
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Passphrase</label>
+          <input class="sfield" id="hod-login-pass" type="password" placeholder="Your group passphrase"
+            value="${esc(SETUP_DATA.passphrase)}" oninput="SETUP_DATA.passphrase=this.value"
+            onkeydown="if(event.key==='Enter')lfHoDLogin()" style="width:100%">
+        </div>
+        <div class="setup-nav">
+          <button class="sbtn-back" onclick="SETUP_DATA.hodMode='create';SETUP_DATA.serverError='';renderSetup()">← Back</button>
+          <button class="sbtn-next" onclick="lfHoDLogin()" ${SETUP_DATA.serverBusy?'disabled style="opacity:.5;"':''}>
+            ${SETUP_DATA.serverBusy?'Signing in…':'Sign in →'}
+          </button>
+        </div>`;
     } else {
       bodyHTML=`
         <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Create your department</h2>
@@ -6422,6 +6445,9 @@ function renderSetup(){
           <button class="sbtn-next" onclick="lfHoDCreate()" ${SETUP_DATA.serverBusy?'disabled style="opacity:.5;"':''}>
             ${SETUP_DATA.serverBusy?'Creating…':'Create group →'}
           </button>
+        </div>
+        <div style="text-align:center;margin-top:14px;">
+          <a onclick="SETUP_DATA.hodMode='login';SETUP_DATA.serverError='';renderSetup()" style="font-size:12px;color:var(--text2);cursor:pointer;text-decoration:underline;">Already created a department? Sign back in</a>
         </div>`;
     }
   }
@@ -6772,6 +6798,34 @@ async function lfHoDCreate(){
   }catch(e){
     sd.serverBusy=false;
     sd.serverError=e.message||'Failed to create group. Please try again.';
+    renderSetup();
+  }
+}
+
+async function lfHoDLogin(){
+  const sd=SETUP_DATA;
+  const code=((document.getElementById('hod-login-code')||{}).value||sd.hodLoginCode||'').toUpperCase().trim();
+  const pass=(document.getElementById('hod-login-pass')||{}).value||sd.passphrase||'';
+  if(code.length!==6){showToast('Enter the full 6-letter join code.');return;}
+  if(!pass){showToast('Enter your passphrase.');return;}
+  sd.hodLoginCode=code; sd.passphrase=pass;
+  sd.serverBusy=true; sd.serverError=''; renderSetup();
+  try{
+    const res=await lfApi.post('/groups/'+code+'/login',{passphrase:pass});
+    localStorage.setItem(LF_TOKEN_KEY,res.token);
+    localStorage.setItem(LF_GCODE_KEY,res.code);
+    localStorage.setItem(LF_TID_KEY,'hod');
+    setRole('hod');
+    U=res.hodName||sd.hodName||''; savU();
+    if(!T[U]) T[U]={name:U,progress:{},gaps:[]};
+    sd.joinCode=res.code; sd.groupCreated=true; sd.serverBusy=false;
+    try{localStorage.setItem(CFG_KEY,JSON.stringify({setupComplete:true,authType:'server',role:'hod'}));}catch(e){}
+    await syncSoWFromServer().catch(()=>{});
+    startHoDPolling();
+    renderSetup();
+  }catch(e){
+    sd.serverBusy=false;
+    sd.serverError=e.message||'Sign in failed. Check your code and passphrase.';
     renderSetup();
   }
 }
