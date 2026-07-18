@@ -4,6 +4,7 @@ import crypto from 'crypto';
 const GROUPS = () => getStore('lf-groups');
 const TOKENS = () => getStore('lf-tokens');
 const RATE = () => getStore('lf-ratelimit');
+const SETTINGS = () => getStore('lf-settings');
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -62,6 +63,25 @@ async function allow(req, bucket, limit, windowMs) {
   rec.count++;
   await store.setJSON(key, rec);
   return rec.count <= limit;
+}
+
+async function getSettings() {
+  const s = await SETTINGS().get('global', { type: 'json' });
+  return s || { paywallEnabled: false };
+}
+async function saveSettings(s) {
+  await SETTINGS().setJSON('global', s);
+}
+
+function isAdmin(req) {
+  const key = req.headers.get('x-admin-key') || '';
+  const expected = process.env.ADMIN_KEY || '';
+  if (!expected || !key || key.length !== expected.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(key), Buffer.from(expected));
+  } catch (e) {
+    return false;
+  }
 }
 
 export default async (req) => {
@@ -155,13 +175,62 @@ export default async (req) => {
     }
 
     if (method === 'GET' && parts[0] === 'billing' && parts[1] === 'status') {
-      return json(200, { active: true });
+      const settings = await getSettings();
+      return json(200, { active: !settings.paywallEnabled });
     }
     if (method === 'GET' && parts[0] === 'billing' && parts[1] === 'plans') {
       return json(200, []);
     }
     if (method === 'POST' && parts[0] === 'billing' && parts[1] === 'checkout') {
       return json(400, { error: 'Billing is not set up yet, your account is free for now.' });
+    }
+
+    // ── Admin routes (protected by x-admin-key header) ──
+    if (parts[0] === 'admin') {
+      if (!(await allow(req, 'admin', 60, 10 * 60 * 1000))) {
+        return json(429, { error: 'Too many attempts. Please wait a few minutes and try again.' });
+      }
+      if (!isAdmin(req)) return json(401, { error: 'Invalid admin key.' });
+
+      if (method === 'GET' && parts[1] === 'stats' && parts.length === 2) {
+        const { blobs } = await GROUPS().list();
+        const groups = [];
+        for (const b of blobs) {
+          const key = b.key || b;
+          const g = await getGroup(key);
+          if (!g) continue;
+          const teachers = Object.values(g.teachers || {});
+          const activityTimes = [
+            g.createdAt || 0,
+            (g.sow && g.sow.updatedAt) || 0,
+            ...teachers.map(t => t.updatedAt || 0)
+          ];
+          groups.push({
+            code: g.code,
+            hodName: g.hodName,
+            teacherCount: teachers.length,
+            createdAt: g.createdAt,
+            lastActivity: Math.max(...activityTimes)
+          });
+        }
+        groups.sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
+        const totalTeachers = groups.reduce((sum, g) => sum + g.teacherCount, 0);
+        return json(200, { totalGroups: groups.length, totalTeachers, groups });
+      }
+
+      if (parts[1] === 'settings' && parts.length === 2) {
+        if (method === 'GET') {
+          return json(200, await getSettings());
+        }
+        if (method === 'PUT') {
+          const s = await getSettings();
+          if (typeof body.paywallEnabled === 'boolean') s.paywallEnabled = body.paywallEnabled;
+          await saveSettings(s);
+          return json(200, s);
+        }
+      }
+
+      return json(404, { error: 'Not found.' });
     }
 
     const tok = bearer(req);
