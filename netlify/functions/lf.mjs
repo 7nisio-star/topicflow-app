@@ -270,12 +270,40 @@ export default async (req) => {
             quantity: 1
           }],
           metadata: { groupCode, planId },
-          success_url: origin + '/?billing=success&code=' + groupCode,
+          success_url: origin + '/?billing=success&code=' + groupCode + '&session_id={CHECKOUT_SESSION_ID}',
           cancel_url: origin + '/?billing=cancel'
         });
         return json(200, { checkoutUrl: session.url, checkoutId: session.id });
       } catch (e) {
         return json(500, { error: 'Could not start checkout: ' + (e && e.message ? e.message : 'unknown error') });
+      }
+    }
+    // Confirms a checkout directly with Stripe using the session id returned
+    // to the success page. This is the primary way payment gets recorded —
+    // no webhook needed, which keeps setup to "paste in one API key."
+    if (method === 'POST' && parts[0] === 'billing' && parts[1] === 'verify') {
+      if (!(await allow(req, 'verify', 30, 10 * 60 * 1000))) {
+        return json(429, { error: 'Too many attempts. Please wait a few minutes and try again.' });
+      }
+      const stripe = stripeClient();
+      if (!stripe) return json(400, { error: 'Billing is not set up yet.' });
+      const sessionId = body.sessionId;
+      const groupCode = (body.groupCode || '').toUpperCase();
+      if (!sessionId || !groupCode) return json(400, { error: 'Missing sessionId or groupCode.' });
+      try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const meta = session.metadata || {};
+        if (meta.groupCode !== groupCode) return json(403, { error: 'Session does not match this group.' });
+        const plan = PLAN_PRICES[meta.planId];
+        if (!plan) return json(400, { error: 'Unknown plan on session.' });
+        if (session.payment_status !== 'paid') return json(200, { active: false });
+        const existing = await getBilling(groupCode);
+        const base = Math.max(existing.paidUntil || 0, Date.now());
+        const paidUntil = base + plan.days * 24 * 60 * 60 * 1000;
+        await saveBilling(groupCode, { plan: meta.planId, paidUntil, updatedAt: Date.now(), lastSessionId: session.id });
+        return json(200, { active: true, plan: meta.planId, paidUntil });
+      } catch (e) {
+        return json(500, { error: 'Could not verify payment: ' + (e && e.message ? e.message : 'unknown error') });
       }
     }
 
