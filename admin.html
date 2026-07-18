@@ -64,6 +64,12 @@
 
   .refresh{background:none;border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;}
   .refresh:hover{color:var(--text);}
+  .badge{font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;font-weight:700;}
+  .badge.active{color:var(--acc2);background:rgba(79,209,165,.12);}
+  .badge.archived{color:var(--text3);background:rgba(255,255,255,.06);}
+  tr.archived-row td{opacity:.55;}
+  .mini-btn{background:none;border:1px solid var(--border);color:var(--text2);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap;}
+  .mini-btn:hover{color:var(--text);border-color:var(--acc);}
   .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
   .loading{color:var(--text3);font-size:13px;}
 </style>
@@ -91,14 +97,15 @@
     </div>
 
     <div class="cards">
-      <div class="card"><div class="n" id="stat-groups">–</div><div class="l">Departments</div></div>
+      <div class="card"><div class="n" id="stat-groups">–</div><div class="l">Active departments</div></div>
       <div class="card"><div class="n" id="stat-teachers">–</div><div class="l">Teachers</div></div>
       <div class="card"><div class="n" id="stat-cap">–</div><div class="l">Of ~200 teacher capacity</div></div>
+      <div class="card"><div class="n" id="stat-archived">–</div><div class="l">Archived</div></div>
     </div>
 
     <div class="panel">
       <h2>Departments</h2>
-      <div class="desc">Every group created so far, most recently active first.</div>
+      <div class="desc">Every group created so far, most recently active first. Archiving frees up a join code from your active count without deleting its data.</div>
       <div id="groups-table"></div>
     </div>
 
@@ -166,24 +173,36 @@ async function loadStats(){
     document.getElementById('stat-groups').textContent = data.totalGroups;
     document.getElementById('stat-teachers').textContent = data.totalTeachers;
     document.getElementById('stat-cap').textContent = Math.round((data.totalTeachers/200)*100) + '%';
+    document.getElementById('stat-archived').textContent = data.archivedGroups || 0;
     if(!data.groups.length){
       tableEl.innerHTML = '<div class="empty">No departments yet.</div>';
     } else {
       tableEl.innerHTML = `<table><thead><tr>
-        <th>HoD</th><th>Join code</th><th>Teachers</th><th>Created</th><th>Last activity</th>
+        <th>HoD</th><th>Join code</th><th>Teachers</th><th>Created</th><th>Last activity</th><th>Status</th><th></th>
       </tr></thead><tbody>` + data.groups.map(g => `
-        <tr>
+        <tr${g.archived?' class="archived-row"':''}>
           <td>${escapeHtml(g.hodName||'—')}</td>
           <td><span class="code">${escapeHtml(g.code)}</span></td>
           <td>${g.teacherCount}</td>
           <td>${fmtDate(g.createdAt)}</td>
           <td>${fmtDate(g.lastActivity)}</td>
+          <td><span class="badge ${g.archived?'archived':'active'}">${g.archived?'Archived':'Active'}</span></td>
+          <td><button class="mini-btn" onclick="toggleArchive('${escapeHtml(g.code)}', ${!g.archived})">${g.archived?'Restore':'Archive'}</button></td>
         </tr>`).join('') + `</tbody></table>`;
     }
     document.getElementById('last-refreshed').textContent = 'Updated ' + new Date().toLocaleTimeString();
   }catch(e){
     document.getElementById('last-refreshed').textContent = '';
     tableEl.innerHTML = '<div class="empty">Could not load stats: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function toggleArchive(code, archive){
+  try{
+    await api('/groups/' + encodeURIComponent(code) + '/archive', { method:'PUT', body: JSON.stringify({ archived: archive }) });
+    loadStats();
+  }catch(e){
+    alert('Could not update: ' + e.message);
   }
 }
 
