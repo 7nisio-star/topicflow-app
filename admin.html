@@ -134,6 +134,16 @@ function fmtDate(ts){
   return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
 }
 
+function fmtBilling(g){
+  if(!g.plan || !g.paidUntil) return '<span style="color:var(--text3);">Free</span>';
+  const paid = g.paidUntil > Date.now();
+  const label = g.plan === 'annual' ? 'Annual' : 'Termly';
+  const dateStr = new Date(g.paidUntil).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+  return paid
+    ? `<span style="color:var(--acc2);">${label} · to ${dateStr}</span>`
+    : `<span style="color:var(--red);">Expired ${dateStr}</span>`;
+}
+
 async function api(path, opts){
   const res = await fetch('/api/lf/admin' + path, Object.assign({
     headers: Object.assign({'x-admin-key': ADMIN_KEY, 'Content-Type':'application/json'}, (opts&&opts.headers)||{})
@@ -178,12 +188,13 @@ async function loadStats(){
       tableEl.innerHTML = '<div class="empty">No departments yet.</div>';
     } else {
       tableEl.innerHTML = `<table><thead><tr>
-        <th>HoD</th><th>Join code</th><th>Teachers</th><th>Created</th><th>Last activity</th><th>Status</th><th></th>
+        <th>HoD</th><th>Join code</th><th>Teachers</th><th>Billing</th><th>Created</th><th>Last activity</th><th>Status</th><th></th>
       </tr></thead><tbody>` + data.groups.map(g => `
         <tr${g.archived?' class="archived-row"':''}>
           <td>${escapeHtml(g.hodName||'—')}</td>
           <td><span class="code">${escapeHtml(g.code)}</span></td>
           <td>${g.teacherCount}</td>
+          <td>${fmtBilling(g)}</td>
           <td>${fmtDate(g.createdAt)}</td>
           <td>${fmtDate(g.lastActivity)}</td>
           <td><span class="badge ${g.archived?'archived':'active'}">${g.archived?'Archived':'Active'}</span></td>
