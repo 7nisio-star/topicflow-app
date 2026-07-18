@@ -9,11 +9,11 @@
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="LessonFlow">
+<meta name="apple-mobile-web-app-title" content="TopicFlow">
 <meta name="theme-color" content="#07080f">
-<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22LessonFlow%22%2C%22short_name%22%3A%22LessonFlow%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%2307080f%22%2C%22theme_color%22%3A%22%2307080f%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%2527http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%2527%2520viewBox%3D%25270%25200%252064%252064%2527%253E%253Crect%2520width%3D%252764%2527%2520height%3D%252764%2527%2520fill%3D%2527%2523170e4a%2527%2520rx%3D%252712%2527%2F%253E%253Ctext%2520x%3D%252732%2527%2520y%3D%252746%2527%2520font-size%3D%252740%2527%2520text-anchor%3D%2527middle%2527%253ELF%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22any%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22TopicFlow%22%2C%22short_name%22%3A%22TopicFlow%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%2307080f%22%2C%22theme_color%22%3A%22%2307080f%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%2527http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%2527%2520viewBox%3D%25270%25200%252064%252064%2527%253E%253Crect%2520width%3D%252764%2527%2520height%3D%252764%2527%2520fill%3D%2527%2523170e4a%2527%2520rx%3D%252712%2527%2F%253E%253Ctext%2520x%3D%252732%2527%2520y%3D%252746%2527%2520font-size%3D%252740%2527%2520text-anchor%3D%2527middle%2527%253ETF%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22any%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-<title>LessonFlow</title>
+<title>TopicFlow</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -944,7 +944,7 @@ body.light #topbar,body.light #scope-bar,body.light #view-tabs{background:rgba(2
       <!-- Class context dropdown -->
       <div class="tb-cls-wrap" id="tb-cls-wrap">
         <button class="tb-cls-btn" id="tb-cls-btn" onclick="toggleClsDropdown()" title="Switch class">
-          <span id="tb-cls-name">LessonFlow</span>
+          <span id="tb-cls-name">TopicFlow</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -1291,7 +1291,7 @@ const API = {
         })
       });
     } catch (e) {
-      console.warn('LessonFlow: offline, will sync later');
+      console.warn('TopicFlow: offline, will sync later');
       // Queue for later (stored in localStorage as pending)
       const q = JSON.parse(localStorage.getItem('lf_sync_q') || '[]');
       q.push({name, ts: Date.now()});
@@ -1317,7 +1317,7 @@ const API = {
       }
       return data;
     } catch (e) {
-      console.warn('LessonFlow: pull failed, using local data');
+      console.warn('TopicFlow: pull failed, using local data');
       return null;
     }
   },
@@ -1743,7 +1743,7 @@ function showConfirm(msg,onOk,onCancel,opts){
 
 /* ════ EXTRACTED INLINE HANDLERS ════ */
 function _doShare(){
-  if(navigator.share){navigator.share({title:'LessonFlow',url:window.location.href});}
+  if(navigator.share){navigator.share({title:'TopicFlow',url:window.location.href});}
   else{navigator.clipboard.writeText(window.location.href).then(()=>showToast('📋 Link copied!')).catch(()=>showToast('Copy the URL to share'));}
 }
 function _copyTeacherLink(name){
@@ -1897,7 +1897,7 @@ async function saveToLocalFolder(){
   try{
     const data={T,U,CUSTOM,timestamp:new Date().toISOString(),term:PD.term};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-    const fh=await _fsHandle.getFileHandle('lessonflow-data.json',{create:true});
+    const fh=await _fsHandle.getFileHandle('topicflow-data.json',{create:true});
     const w=await fh.createWritable();
     await w.write(blob); await w.close();
   }catch(e){console.warn('FS save failed:',e);}
@@ -1905,7 +1905,7 @@ async function saveToLocalFolder(){
 async function loadFromLocalFolder(){
   if(!_fsHandle) return;
   try{
-    const fh=await _fsHandle.getFileHandle('lessonflow-data.json');
+    const fh=await _fsHandle.getFileHandle('topicflow-data.json');
     const file=await fh.getFile();
     const data=JSON.parse(await file.text());
     if(data.T) T=data.T;
@@ -2435,7 +2435,7 @@ function renderCalendar(){
 
   co.innerHTML=`<div class="page">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;"><button onclick="goBack()" class="btn" style="font-size:12px;">← Back</button><div style="font-size:17px;font-weight:700;">🗓 School Calendar</div></div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Configure your school year start date and holiday weeks. This updates all week dates across LessonFlow.</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Configure your school year start date and holiday weeks. This updates all week dates across TopicFlow.</div>
 
     <div style="background:var(--panel);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Term start date</div>
@@ -2562,7 +2562,7 @@ function printGantt(){
   const legend=tn.map(n=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:10px;"><span style="width:14px;height:6px;border-radius:2px;background:${avCol(n)};display:inline-block;"></span>${n}</span>`).join('');
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>LessonFlow Gantt — ${cls.name}</title>
+  <title>TopicFlow Gantt — ${cls.name}</title>
   <style>
     body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;color:#111;margin:0;padding:0}
     .page{padding:20px 16px}
@@ -2576,7 +2576,7 @@ function printGantt(){
     @media print{@page{margin:10mm;size:A3 landscape}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style></head>
   <body><div class="page">
-    <h1>LessonFlow — ${cls.name} Gantt Chart</h1>
+    <h1>TopicFlow — ${cls.name} Gantt Chart</h1>
     <div class="meta">${PD.term} · Week ${cw} · ${wLabel(cw)} · ${tn.length} teacher${tn.length!==1?'s':''} · Generated ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
     <div class="month-hdr" style="width:${TW+200}px;"><div style="position:absolute;left:0;width:200px;height:20px;"></div>${mHdr.replace(/left:/g,'left:calc(200px + ')}</div>
     <div class="week-hdr" style="width:${TW+200}px;"><div style="position:absolute;left:0;width:200px;height:18px;font-size:9px;padding:3px 8px;color:#888;font-weight:700;">TOPIC</div>${wHdr.replace(/left:/g,'left:calc(200px + ')}</div>
@@ -2678,7 +2678,7 @@ function runTests(){
   const failed=results.filter(r=>!r.pass);
   const pct2=Math.round(passed/results.length*100);
   const summary=`${passed}/${results.length} tests passed (${pct2}%)`;
-  console.log('LessonFlow Test Suite — '+summary);
+  console.log('TopicFlow Test Suite — '+summary);
   results.forEach(r=>console[r.pass?'log':'error']((r.pass?'✅':'❌')+' '+r.name+(r.pass?'':' → got: '+JSON.stringify(r.got)+', expected: '+JSON.stringify(r.expected))));
   // console.groupEnd;
   return {passed,failed,total:results.length,summary,ok:failed.length===0};
@@ -3502,7 +3502,7 @@ function togglePlayback(){
 /* ─── render() safe wrapper ─── */
 const _renderRaw=render;
 window.addEventListener('error',e=>{
-  console.error('LessonFlow:',e.message);
+  console.error('TopicFlow:',e.message);
   const co=document.getElementById('content');
   if(co&&!co.querySelector('[data-err]'))co.innerHTML='<div data-err style="padding:24px;text-align:center;color:var(--text2);"><div style="font-size:32px;margin-bottom:10px;">⚠</div><div style="font-size:14px;font-weight:600;margin-bottom:6px;">Something went wrong</div><div style="font-size:12px;color:var(--text3);margin-bottom:14px;">'+e.message+'</div><button onclick="location.reload()" class="btn">↺ Reload</button></div>';
 });
@@ -4611,7 +4611,7 @@ function exportSLTReport(){
   }).join('');
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>LessonFlow — SLT Report — W${cw}</title>
+  <title>TopicFlow — SLT Report — W${cw}</title>
   <style>
     body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;color:#111;margin:0;padding:0;background:#fff}
     .page{max-width:820px;margin:0 auto;padding:32px 28px}
@@ -4666,8 +4666,8 @@ function exportSLTReport(){
     <tbody>${teacherRows||'<tr><td colspan="3" style="padding:8px 10px;color:#aaa;">No data.</td></tr>'}</tbody></table>
 
     <div class="footer">
-      <span>LessonFlow · ${PD.term} · Confidential — SLT use only</span>
-      <span>Generated by LessonFlow v1 · Denis Mushangwe, DM Venture &amp; Insights</span>
+      <span>TopicFlow · ${PD.term} · Confidential — SLT use only</span>
+      <span>Generated by TopicFlow v1 · Denis Mushangwe, DM Venture &amp; Insights</span>
     </div>
   </div>
   \u003cscript\u003ewindow.onload=()=>window.print();\u003c/script\u003e
@@ -4726,7 +4726,7 @@ function exportTermReport(teacherName){
     </div>`;
   }).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>LessonFlow — Term Report — ${esc(name)}</title>
+  <title>TopicFlow — Term Report — ${esc(name)}</title>
   <style>
     body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;color:#111;margin:0;padding:0;background:#fff}
     .page{max-width:820px;margin:0 auto;padding:32px 28px}
@@ -4748,7 +4748,7 @@ function exportTermReport(teacherName){
       </div>
     </div>
     ${rows}
-    <div style="font-size:10px;color:#aaa;text-align:center;margin-top:24px;border-top:1px solid #e0e0e0;padding-top:12px;">LessonFlow · Confidential · For departmental use only</div>
+    <div style="font-size:10px;color:#aaa;text-align:center;margin-top:24px;border-top:1px solid #e0e0e0;padding-top:12px;">TopicFlow · Confidential · For departmental use only</div>
   </div>
   </body></html>`;
   const w=window.open('','_blank');
@@ -4986,7 +4986,7 @@ function exportCSV(){
   const blob=new Blob([csv],{type:'text/csv'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=`LessonFlow_${PD.term.replace(/\s+/g,'_')}_W${cw}.csv`;
+  a.download=`TopicFlow_${PD.term.replace(/\s+/g,'_')}_W${cw}.csv`;
   a.click();
   showToast('CSV downloaded');
 }
@@ -5027,7 +5027,7 @@ function exportPDF(){
   }).join('');
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>LessonFlow — ${PD.term} — W${cw} Report</title>
+  <title>TopicFlow — ${PD.term} — W${cw} Report</title>
   <style>
     body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;color:#111;margin:0;padding:0}
     .page{max-width:800px;margin:0 auto;padding:32px 28px}
@@ -5062,7 +5062,7 @@ function exportPDF(){
 .skip-link:focus{position:fixed;top:10px;left:10px;width:auto;height:auto;background:var(--acc);color:#fff;padding:8px 16px;border-radius:8px;font-weight:700;font-size:13px;}
 </style></head>
   <body><div class="page">
-    <h1>LessonFlow — Department Report</h1>
+    <h1>TopicFlow — Department Report</h1>
     <div class="meta">${PD.term} · Week ${cw} · ${wLabel(cw)} · Generated ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
 
     <div class="score-box">
@@ -5079,7 +5079,7 @@ function exportPDF(){
     <table><thead><tr><th>Teacher</th><th>Progress by class</th></tr></thead>
     <tbody>${teacherRows||'<tr><td colspan="2" style="padding:8px 10px;color:#aaa;">No teacher data.</td></tr>'}</tbody></table>
 
-    <div class="footer">LessonFlow · ${PD.term} · Confidential — for internal department use</div>
+    <div class="footer">TopicFlow · ${PD.term} · Confidential — for internal department use</div>
   </div>
   \u003cscript\u003ewindow.onload=()=>window.print();\u003c/script\u003e
   </body></html>`;
@@ -5117,14 +5117,14 @@ function render(){
   // Expiry check
   checkExpiry();
   if(window._appExpired){
-    document.body.innerHTML='<div style="position:fixed;inset:0;background:#07080f;display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#fff;text-align:center;padding:20px;"><div><div style="font-size:48px;margin-bottom:16px;">⏰</div><h1 style="font-weight:800;font-size:22px;margin-bottom:8px;">This copy of LessonFlow has expired</h1><p style="color:#888;margin-bottom:20px;">Contact your supplier to renew. Your data is safe.</p><p style="font-size:12px;color:#555;">hello@lessonflow.io</p></div></div>';
+    document.body.innerHTML='<div style="position:fixed;inset:0;background:#07080f;display:flex;align-items:center;justify-content:center;font-family:sans-serif;color:#fff;text-align:center;padding:20px;"><div><div style="font-size:48px;margin-bottom:16px;">⏰</div><h1 style="font-weight:800;font-size:22px;margin-bottom:8px;">This copy of TopicFlow has expired</h1><p style="color:#888;margin-bottom:20px;">Contact your supplier to renew. Your data is safe.</p><p style="font-size:12px;color:#555;">hello@lessonflow.io</p></div></div>';
     return;
   }
   if(window._expiryWarning){
     const eb=document.getElementById('expiry-warn');
     if(!eb){const b=document.createElement('div');b.id='expiry-warn';
       b.style.cssText='position:fixed;bottom:50px;left:50%;transform:translateX(-50%);background:rgba(255,176,64,.95);color:#111;padding:6px 16px;border-radius:16px;font-size:11px;font-weight:700;z-index:990;cursor:pointer;white-space:nowrap;';
-      b.textContent='⏰ LessonFlow expires in '+window._expiryWarning+' days — contact hello@lessonflow.io to renew';
+      b.textContent='⏰ TopicFlow expires in '+window._expiryWarning+' days — contact hello@lessonflow.io to renew';
       b.onclick=()=>b.remove();
       document.body.appendChild(b);}
   }
@@ -5195,9 +5195,9 @@ function render(){
   // Class name in topbar dropdown button
   const clsNameEl=document.getElementById('tb-cls-name');
   if(clsNameEl){
-    if(DASH) clsNameEl.textContent='LessonFlow';
+    if(DASH) clsNameEl.textContent='TopicFlow';
     else if(activeCls) clsNameEl.textContent=activeCls.name;
-    else clsNameEl.textContent=YID==='__hod'?'Department':YID==='__add'?'Settings':'LessonFlow';
+    else clsNameEl.textContent=YID==='__hod'?'Department':YID==='__add'?'Settings':'TopicFlow';
   }
 
   // Class dropdown content
@@ -6295,7 +6295,7 @@ function renderAddCls(){
           return '<div style="text-align:center;padding:10px;background:var(--panel2);border-radius:8px;"><div style="font-size:20px;font-weight:800;">'+v+'</div><div style="font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;font-weight:700;">'+l+'</div></div>';
         }).join('');
       }
-      if(al) al.textContent='LessonFlow · '+PD.term+' · Data stored in your browser';
+      if(al) al.textContent='TopicFlow · '+PD.term+' · Data stored in your browser';
     },0);
 }
 
@@ -6343,7 +6343,7 @@ function renderSetup(){
   if(SETUP_STEP===0){
     // ── STEP 0: Role choice ──
     bodyHTML=`
-      <h2 style="font-size:24px;font-weight:800;margin-bottom:6px;">Welcome to LessonFlow</h2>
+      <h2 style="font-size:24px;font-weight:800;margin-bottom:6px;">Welcome to TopicFlow</h2>
       <p style="color:var(--text2);font-size:13px;margin-bottom:28px;">What best describes you?</p>
       <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">
         <div onclick="SETUP_DATA.path='hod';SETUP_STEP=1;renderSetup();"
@@ -6372,7 +6372,7 @@ function renderSetup(){
             <div style="font-size:30px;">💻</div>
             <div>
               <div style="font-size:15px;font-weight:700;margin-bottom:2px;">Use locally (no account)</div>
-              <div style="font-size:12px;color:var(--text2);">Data stays on this device only. Great for trying LessonFlow solo.</div>
+              <div style="font-size:12px;color:var(--text2);">Data stays on this device only. Great for trying TopicFlow solo.</div>
             </div>
           </div>
         </div>
@@ -6564,7 +6564,7 @@ function renderSetup(){
   else if(SETUP_STEP===2){
     // ── STEP 2: AI provider ──
     const teacherNote=SETUP_DATA.role!=='hod'?`<div style="background:rgba(0,212,173,.08);border:1px solid rgba(0,212,173,.2);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--teal);">
-      <strong>✓ AI is optional.</strong> You can skip this step — LessonFlow works great without it.<br>
+      <strong>✓ AI is optional.</strong> You can skip this step — TopicFlow works great without it.<br>
       <span style="color:var(--text2);">AI is only needed to auto-read a curriculum PDF or Word doc. You can always configure it later in Settings.</span>
     </div>`:'';
     const providers=[
@@ -6747,7 +6747,7 @@ function renderSetup(){
 
       <div class="setup-nav">
         <button class="sbtn-back" onclick="SETUP_STEP=3;renderSetup()">← Back</button>
-        <button class="sbtn-next" onclick="finishSetup()">Launch LessonFlow →</button>
+        <button class="sbtn-next" onclick="finishSetup()">Launch TopicFlow →</button>
       </div>`;
   }
 
@@ -7348,7 +7348,7 @@ function renderModal(){
 <div id="lf-billing-banner">
   <span style="font-size:20px;">🎓</span>
   <div class="bb-msg">
-    <strong>LessonFlow — Free trial mode</strong><br>
+    <strong>TopicFlow — Free trial mode</strong><br>
     <span>Subscribe to unlock sync for your whole department.</span>
   </div>
   <button onclick="lfBilling.openModal()" class="btna btn" style="font-size:12px;white-space:nowrap;">Subscribe →</button>
@@ -7358,7 +7358,7 @@ function renderModal(){
 <!-- Subscribe modal -->
 <div id="lf-sub-modal">
   <div class="lf-sub-box">
-    <div class="lf-sub-title">Upgrade LessonFlow</div>
+    <div class="lf-sub-title">Upgrade TopicFlow</div>
     <div class="lf-sub-sub">One purchase unlocks real-time sync for you and your whole department.</div>
     <div id="lf-plans-container"><div style="text-align:center;padding:20px;color:var(--text2);">Loading plans…</div></div>
     <div style="display:flex;gap:8px;margin-top:16px;">
@@ -7370,7 +7370,7 @@ function renderModal(){
 </div>
 
 <script>
-/* ══ LessonFlow Billing (Whop) ══════════════════════════════════ */
+/* ══ TopicFlow Billing (Whop) ══════════════════════════════════ */
 const lfBilling = (() => {
   let plans = [];
   let selectedPlanId = null;
@@ -7549,7 +7549,7 @@ if (new URLSearchParams(window.location.search).get('billing') === 'success') {
 <script>
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
   const swCode=`
-const CACHE='lessonflow-v1';
+const CACHE='topicflow-v1';
 self.addEventListener('install',e=>{self.skipWaiting();});
 self.addEventListener('activate',e=>{
   e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
@@ -7575,7 +7575,7 @@ self.addEventListener('fetch',e=>{
     }).catch(()=>{});
   }catch(e){}
 } else if(location.protocol==='file:'){
-  console.info('LessonFlow: open via http:// for offline caching. Works fine without it.');
+  console.info('TopicFlow: open via http:// for offline caching. Works fine without it.');
 }
 </script>
 </body>
