@@ -7578,6 +7578,7 @@ const lfBilling = (() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('billing') !== 'success') return;
     const code = params.get('code');
+    const sessionId = params.get('session_id');
     const storedCode = localStorage.getItem(LF_GCODE_KEY);
     if (!code || !storedCode || code.toUpperCase() !== storedCode.toUpperCase()) return;
 
@@ -7587,18 +7588,28 @@ const lfBilling = (() => {
 
     showToast('✓ Payment received — activating your subscription…');
 
-    // We don't have a checkoutId in this new page load, but we can poll status
-    // The membership will be confirmed server-side once the webhook fires,
-    // or we can ask the user to wait and then check status.
-    // For UX: poll the status endpoint a few times
     const gcode = storedCode;
     let activated = false;
-    for (let i = 0; i < 6; i++) {
-      await new Promise(r => setTimeout(r, 2000));
+
+    // Primary path: confirm the Stripe Checkout Session directly (no webhook
+    // needed — the function checks payment_status with Stripe itself).
+    if (sessionId) {
       try {
-        const st = await lfApi.get('/billing/status/' + gcode);
-        if (st.active) { activated = true; break; }
+        const v = await lfApi.post('/billing/verify', { sessionId, groupCode: gcode });
+        if (v.active) activated = true;
       } catch (e) {}
+    }
+
+    // Fallback: poll status in case verify raced ahead of Stripe or session_id
+    // was missing for some reason.
+    if (!activated) {
+      for (let i = 0; i < 6; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const st = await lfApi.get('/billing/status/' + gcode);
+          if (st.active) { activated = true; break; }
+        } catch (e) {}
+      }
     }
     if (activated) {
       document.getElementById('lf-billing-banner').classList.remove('show');
