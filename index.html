@@ -1256,6 +1256,42 @@ function checkExpiry(){
 // when the setup wizard is opened during startup.
 var _trapStack=[];
 
+/* ════ SERVER API CLIENT ════════════════════════════════════════
+   lfApi — wraps fetch to /api/lf, attaches token, throws on non-2xx.
+   Tokens stored in localStorage as lf_token. Group code in lf_gcode.
+   Declared here (before the boot IIFE below) because that IIFE calls
+   lfApi.get('/me') synchronously on every load for returning users — a
+   `const` declared further down is in the temporal dead zone until its own
+   line runs, so calling it from code that executes earlier throws
+   "Cannot access 'lfApi' before initialization" every single time. That
+   silently killed the entire returning-user boot path (role sync, HoD
+   polling, demo-teacher cleanup, autosave, the lot) for anyone who wasn't
+   in the middle of the first-run setup wizard.
+════════════════════════════════════════════════════════════════ */
+const lfApi={
+  _base:'/api/lf',
+  _tok(){return localStorage.getItem(LF_TOKEN_KEY)||'';},
+  async _req(method,path,body){
+    const opts={method,headers:{'Content-Type':'application/json'}};
+    const tok=this._tok();
+    if(tok) opts.headers['Authorization']='Bearer '+tok;
+    if(body!==undefined) opts.body=JSON.stringify(body);
+    let r;
+    try{r=await fetch(this._base+path,opts);}
+    catch(e){throw Object.assign(new Error('Network error'),{status:0});}
+    if(!r.ok){
+      let msg='API error';
+      try{const j=await r.json();msg=j.error||msg;}catch(e2){}
+      throw Object.assign(new Error(msg),{status:r.status});
+    }
+    if(r.status===204) return null;
+    return r.json();
+  },
+  get(path){return this._req('GET',path);},
+  post(path,body){return this._req('POST',path,body);},
+  put(path,body){return this._req('PUT',path,body);},
+};
+
 (function(){
   // Snapshot original classes before SoL overrides them
   window._PD_CLASSES_ORIG=JSON.stringify(PD.classes);
@@ -1371,34 +1407,6 @@ function savC(){try{localStorage.setItem(CK,JSON.stringify(CUSTOM));}catch(e){}}
 ════════════════════════════════════════════════════════ */
 function getRole(){try{return localStorage.getItem('lf_role')||'teacher';}catch(e){return 'teacher';}}
 function setRole(r){try{localStorage.setItem('lf_role',r);}catch(e){}}
-
-/* ════ SERVER API CLIENT ════════════════════════════════════════
-   lfApi — wraps fetch to /api/lf, attaches token, throws on non-2xx.
-   Tokens stored in localStorage as lf_token. Group code in lf_gcode.
-════════════════════════════════════════════════════════════════ */
-const lfApi={
-  _base:'/api/lf',
-  _tok(){return localStorage.getItem(LF_TOKEN_KEY)||'';},
-  async _req(method,path,body){
-    const opts={method,headers:{'Content-Type':'application/json'}};
-    const tok=this._tok();
-    if(tok) opts.headers['Authorization']='Bearer '+tok;
-    if(body!==undefined) opts.body=JSON.stringify(body);
-    let r;
-    try{r=await fetch(this._base+path,opts);}
-    catch(e){throw Object.assign(new Error('Network error'),{status:0});}
-    if(!r.ok){
-      let msg='API error';
-      try{const j=await r.json();msg=j.error||msg;}catch(e2){}
-      throw Object.assign(new Error(msg),{status:r.status});
-    }
-    if(r.status===204) return null;
-    return r.json();
-  },
-  get(path){return this._req('GET',path);},
-  post(path,body){return this._req('POST',path,body);},
-  put(path,body){return this._req('PUT',path,body);},
-};
 
 /* ─── Prefs helpers ─── */
 function getPrefs(){try{return JSON.parse(localStorage.getItem(LF_PREFS_KEY)||'{}');}catch(e){return {};}}
