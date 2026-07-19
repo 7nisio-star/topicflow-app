@@ -1805,6 +1805,9 @@ let CE={cls:null, dragging:null, holidays:[]};
 // Backup of a class's topic order/weeks before suggestThreadOrder() applies a
 // new order, so undoThreadOrder() can restore it. {clsId, topics:[...]} or null.
 let _lastThreadOrderBackup=null;
+// AI Curriculum Review: latest analysis result, a backup of every touched
+// class's topics (for undo), and a loading flag. See runAICurriculumAnalysis().
+let _aiPlan=null, _lastAIPlanBackup=null, _aiLoading=false;
 function openCurricEditor(clsId){
   if(!isHoD()){showToast('Curriculum editing is HoD-only.');return;}
   CE.cls=getCls(clsId)||allCls()[0];
@@ -1889,6 +1892,7 @@ function renderCurricEditor(){
       ${hod?'<button onclick="ceImportFromExcel()" class="btn" style="font-size:12px;">📥 Import Excel</button>':''}
       ${hod?'<button onclick="renderStrandManager()" class="btn" style="font-size:12px;">🗂 Golden threads</button>':''}
       ${hod?'<button onclick="suggestThreadOrder()" class="btn" style="font-size:12px;">✨ Suggest order</button>':''}
+      ${hod?'<button onclick="openAIReview()" class="btn" style="font-size:12px;">🤖 AI curriculum review</button>':''}
       ${hod?'<button onclick="saveCurric()" class="btna btn" style="font-size:12px;margin-left:auto;">💾 Save</button>':''}
     </div>
 
@@ -2008,8 +2012,14 @@ function ceAddTopic(startWeek){
   ceRelayout(); renderCurricEditor();
 }
 function ceRelayout(){
-  // Reflow topic start/end so they don't overlap, respecting holidays
-  const cls=CE.cls, hols=CE.holidays;
+  relayoutClassTopics(CE.cls);
+}
+// Reflow a class's topic start/end so they don't overlap, respecting
+// holidays. Same algorithm ceRelayout() always used, just parameterized so
+// AI Curriculum Review can relayout classes other than the one currently
+// open in the editor.
+function relayoutClassTopics(cls){
+  const hols=CE.holidays;
   let w=1;
   cls.topics.forEach(t=>{
     const dur=t.end-t.start+1;
@@ -2196,6 +2206,280 @@ function undoThreadOrder(){
   _lastThreadOrderBackup=null;
   renderCurricEditor();
   showToast('↩ Reverted to previous order.');
+}
+
+/* ════════════════════════════════════════════════════════
+   AI CURRICULUM REVIEW
+   Uses whichever AI provider the HoD already configured (Claude / Gemini /
+   Azure Copilot — same config used for scheme-of-work import) to look across
+   every year group at once and suggest (a) a better week-by-week order
+   within a year group and (b) specific topics that would fit better in a
+   different — usually later — year group. Nothing is changed until the HoD
+   reviews the summary and clicks "Apply suggestions", and it can be undone.
+════════════════════════════════════════════════════════ */
+function openAIReview(){
+  if(!isHoD()){showToast('This is HoD-only.');return;}
+  renderAIReview();
+}
+function aiConfigured(){
+  const p=SETUP_DATA.aiProvider;
+  if(!p||p==='none') return false;
+  if(p==='claude') return !!SETUP_DATA.apiKey;
+  if(p==='gemini') return !!SETUP_DATA.geminiKey;
+  if(p==='copilot') return !!(SETUP_DATA.apiKey&&SETUP_DATA.azureEndpoint);
+  return false;
+}
+function renderAIReview(){
+  const co=document.getElementById('content');
+  co.style.overflowY='auto';
+
+  if(!aiConfigured()){
+    const providers=[
+      {id:'claude',  logo:'🟠', name:'Claude',  sub:'Anthropic API key'},
+      {id:'copilot', logo:'🔷', name:'Copilot', sub:'Azure OpenAI'},
+      {id:'gemini',  logo:'🔵', name:'Gemini',  sub:'Google AI Studio key'},
+    ];
+    co.innerHTML=`<div style="max-width:640px;margin:0 auto;padding:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <button onclick="goBack()" class="btn" style="font-size:12px;">← Back</button>
+        <div style="font-size:17px;font-weight:700;">🤖 AI Curriculum Review</div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:18px;">
+        Connect an AI provider to analyse your curriculum. It looks at your topics and golden threads and
+        suggests a better order — and whether any topic would fit a different year group. Your key is stored
+        only on this device and sent directly from your browser to the provider you choose.
+      </div>
+      <div class="ai-grid">
+        ${providers.map(p=>`
+          <div class="ai-card${SETUP_DATA.aiProvider===p.id?' sel':''}" onclick="SETUP_DATA.aiProvider='${p.id}';renderAIReview();">
+            <div class="ai-card-logo">${p.logo}</div>
+            <div class="ai-card-name">${p.name}</div>
+            <div class="ai-card-sub">${p.sub}</div>
+          </div>`).join('')}
+      </div>
+      ${SETUP_DATA.aiProvider==='claude'?`
+        <div style="margin:14px 0;">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Anthropic API key</label>
+          <input class="sfield" type="password" placeholder="sk-ant-api03-..."
+            value="${SETUP_DATA.apiKey||''}" oninput="SETUP_DATA.apiKey=this.value">
+          <div style="font-size:11px;color:var(--text3);margin-top:4px;">Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--acc);">console.anthropic.com</a></div>
+        </div>`:''}
+      ${SETUP_DATA.aiProvider==='gemini'?`
+        <div style="margin:14px 0;">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Google AI Studio key</label>
+          <input class="sfield" type="password" placeholder="AIzaSy..."
+            value="${SETUP_DATA.geminiKey||''}" oninput="SETUP_DATA.geminiKey=this.value">
+        </div>`:''}
+      ${SETUP_DATA.aiProvider==='copilot'?`
+        <div style="margin:14px 0;">
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Azure OpenAI endpoint</label>
+          <input class="sfield" placeholder="https://your-resource.openai.azure.com"
+            value="${SETUP_DATA.azureEndpoint||''}" oninput="SETUP_DATA.azureEndpoint=this.value">
+          <label style="font-size:12px;font-weight:600;display:block;margin:10px 0 6px;">API key</label>
+          <input class="sfield" type="password" value="${SETUP_DATA.apiKey||''}" oninput="SETUP_DATA.apiKey=this.value">
+          <label style="font-size:12px;font-weight:600;display:block;margin:10px 0 6px;">Deployment name</label>
+          <input class="sfield" placeholder="gpt-4o" value="${SETUP_DATA.azureDeployment||'gpt-4o'}" oninput="SETUP_DATA.azureDeployment=this.value">
+        </div>`:''}
+      ${SETUP_DATA.aiProvider&&SETUP_DATA.aiProvider!=='none'?`<button onclick="setupSaveConfig();renderAIReview();" class="btna btn" style="font-size:12px;">Save &amp; continue →</button>`:''}
+    </div>`;
+    return;
+  }
+
+  co.innerHTML=`<div style="max-width:760px;margin:0 auto;padding:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
+      <button onclick="goBack()" class="btn" style="font-size:12px;">← Back</button>
+      <div style="font-size:17px;font-weight:700;">🤖 AI Curriculum Review</div>
+      <button onclick="SETUP_DATA.aiProvider='none';renderAIReview();" class="btn" style="font-size:11px;margin-left:auto;">⚙ Change AI provider</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">
+      Looks across all your year groups at once — order within each year, and whether any topic would fit better in a different (usually later) year group.
+    </div>
+
+    ${_aiLoading?`<div style="text-align:center;padding:40px 0;">
+        <div class="spinner"></div>
+        <div style="font-size:13px;color:var(--text2);margin-top:10px;">🤖 Analysing your curriculum…</div>
+      </div>`
+    : !_aiPlan?`
+      <button onclick="runAICurriculumAnalysis()" class="btna btn" style="font-size:13px;padding:10px 18px;">✨ Run AI analysis</button>
+    `:`
+      <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">Generated ${new Date(_aiPlan.generatedAt).toLocaleString()}</div>
+
+      ${_aiPlan.reorders&&_aiPlan.reorders.length?`<div class="divider"></div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Suggested reorders</div>
+        ${_aiPlan.reorders.map(r=>{const cls=getCls(r.classId);if(!cls)return '';
+          const names=r.order.map(tid=>{const t=cls.topics.find(x=>x.id===tid);return t?t.name:null;}).filter(Boolean);
+          return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:4px;">${esc(cls.name)}</div>
+            <div style="font-size:11px;color:var(--text2);">${names.map(esc).join(' → ')}</div>
+          </div>`;}).join('')}`:''}
+
+      ${_aiPlan.moves&&_aiPlan.moves.length?`<div class="divider"></div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Suggested year-group moves</div>
+        ${_aiPlan.moves.map(m=>{const from=getCls(m.fromClassId),to=getCls(m.toClassId);if(!from||!to)return '';
+          return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:3px;">${esc(m.topicName)}: ${esc(from.name)} → ${esc(to.name)}</div>
+            <div style="font-size:11px;color:var(--text2);">${esc(m.reason||'')}</div>
+          </div>`;}).join('')}`:''}
+
+      ${(!_aiPlan.reorders||!_aiPlan.reorders.length)&&(!_aiPlan.moves||!_aiPlan.moves.length)?`<div style="font-size:12px;color:var(--teal);padding:10px 0;">✓ AI found nothing worth changing — your curriculum order already looks solid.</div>`:''}
+
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+        ${(_aiPlan.reorders&&_aiPlan.reorders.length)||(_aiPlan.moves&&_aiPlan.moves.length)?`<button onclick="applyAIPlan()" class="btna btn" style="font-size:12px;">✓ Apply suggestions</button>`:''}
+        <button onclick="_aiPlan=null;renderAIReview();" class="btn" style="font-size:12px;">🔄 Re-run analysis</button>
+        ${_lastAIPlanBackup?`<button onclick="undoAIPlan()" class="btn" style="font-size:12px;color:var(--red);">↩ Undo last applied changes</button>`:''}
+      </div>
+    `}
+  </div>`;
+}
+function buildAICurricSnapshot(){
+  return allCls().map(cls=>({
+    id:cls.id,
+    name:cls.name,
+    topics:cls.topics.map(t=>({
+      id:t.id,
+      name:t.name,
+      weeks:t.end-t.start+1,
+      thread:(getTopicStrand(cls.id,t.id)||{}).name||null
+    }))
+  }));
+}
+async function runAICurriculumAnalysis(){
+  if(!aiConfigured()){showToast('Configure an AI provider first.');return;}
+  _aiLoading=true; renderAIReview();
+  try{
+    const snapshot=buildAICurricSnapshot();
+    const prompt=`You are a curriculum analyst helping a UK school Head of Department improve their scheme of work.
+Below is every year group currently taught, in order, with each topic's id, name, length in weeks, and (if set) its "golden thread" — a recurring strand like Number, Algebra, Geometry that should ideally be spread across the year rather than clustered.
+
+YEAR GROUPS (JSON):
+${JSON.stringify(snapshot)}
+
+Suggest two things:
+1. "reorders": for any year group where a better week-by-week order would help (e.g. interleaving golden threads, putting foundational topics before ones that depend on them), give the FULL new order as a list of topic ids for that year group. Only include a year group here if you are actually changing its order.
+2. "moves": specific individual topics that would be better taught in a DIFFERENT year group than they currently are — most often deferring a topic to a later, more appropriate year group (e.g. content too advanced for the current year, or duplicated elsewhere). Only suggest moves between year groups that both appear in the list above, using their exact ids. Give a short one-sentence reason for each.
+
+Be conservative — only suggest a reorder or move if you have a genuinely good pedagogical reason. It's fine to suggest nothing.
+
+Return ONLY valid JSON, no markdown, no explanation, in exactly this shape:
+{"reorders":[{"classId":"y9","order":["topicId1","topicId2"]}],"moves":[{"topicId":"y9_3","topicName":"Topic name","fromClassId":"y9","toClassId":"y10h","reason":"..."}]}`;
+
+    const raw=await aiCallRaw(prompt);
+    const clean=raw.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+
+    const validClassIds=new Set(allCls().map(c=>c.id));
+    const reorders=(parsed.reorders||[]).filter(r=>validClassIds.has(r.classId)&&Array.isArray(r.order));
+    const moves=(parsed.moves||[]).filter(m=>validClassIds.has(m.fromClassId)&&validClassIds.has(m.toClassId)&&m.fromClassId!==m.toClassId&&m.topicId);
+
+    _aiPlan={generatedAt:Date.now(),reorders,moves};
+  }catch(err){
+    showToast('AI analysis failed: '+err.message);
+  }
+  _aiLoading=false;
+  renderAIReview();
+}
+// Generic text-in/text-out call to whichever AI provider is configured.
+// Kept separate from aiParseDocument() (which also handles PDF uploads for
+// the scheme-of-work import) so that existing feature stays unchanged.
+async function aiCallRaw(promptText){
+  const cfg=SETUP_DATA;
+  if(cfg.aiProvider==='claude'){
+    const key=cfg.apiKey; if(!key) throw new Error('No Claude API key configured');
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({model:cfg.claudeModel||'claude-sonnet-4-20250514',max_tokens:4096,messages:[{role:'user',content:promptText}]})
+    });
+    if(!res.ok) throw new Error('Claude API error: '+res.status);
+    const d=await res.json();
+    return d.content[0].text;
+  }
+  if(cfg.aiProvider==='gemini'){
+    const key=cfg.geminiKey; if(!key) throw new Error('No Gemini API key configured');
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({contents:[{parts:[{text:promptText}]}]})
+    });
+    if(!res.ok) throw new Error('Gemini API error: '+res.status);
+    const d=await res.json();
+    return d.candidates[0].content.parts[0].text;
+  }
+  if(cfg.aiProvider==='copilot'){
+    const key=cfg.apiKey, ep=cfg.azureEndpoint, dep=cfg.azureDeployment||'gpt-4o';
+    if(!key||!ep) throw new Error('Azure endpoint and key required');
+    const res=await fetch(`${ep}/openai/deployments/${dep}/chat/completions?api-version=2024-02-01`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','api-key':key},
+      body:JSON.stringify({messages:[
+        {role:'system',content:'You are a curriculum analyst. Return only valid JSON.'},
+        {role:'user',content:promptText}
+      ],max_tokens:4096})
+    });
+    if(!res.ok) throw new Error('Azure OpenAI error: '+res.status);
+    const d=await res.json();
+    return d.choices[0].message.content;
+  }
+  throw new Error('No AI provider configured');
+}
+function persistCurriculumChanges(classIds){
+  classIds.forEach(id=>{const c=getCls(id);if(c) c._custom=true;});
+  try{
+    const sol=PD.classes.filter(c2=>c2._custom);
+    localStorage.setItem(SOL_KEY,JSON.stringify(sol));
+  }catch(e){}
+}
+function applyAIPlan(){
+  if(!_aiPlan) return;
+  const n=(_aiPlan.reorders||[]).length, m=(_aiPlan.moves||[]).length;
+  showConfirm(
+    `Apply AI suggestions? This will reorder topics in ${n} year group(s) and move ${m} topic(s) to a different year group. You can undo this afterwards.`,
+    function(){
+      const touchedIds=new Set();
+      _aiPlan.reorders.forEach(r=>touchedIds.add(r.classId));
+      _aiPlan.moves.forEach(mv=>{touchedIds.add(mv.fromClassId);touchedIds.add(mv.toClassId);});
+
+      _lastAIPlanBackup={classes:[...touchedIds].map(id=>{
+        const c=getCls(id);
+        return {id,topics:JSON.parse(JSON.stringify(c.topics))};
+      })};
+
+      _aiPlan.reorders.forEach(r=>{
+        const cls=getCls(r.classId); if(!cls) return;
+        const byId={}; cls.topics.forEach(t=>byId[t.id]=t);
+        const ordered=r.order.map(tid=>byId[tid]).filter(Boolean);
+        const remaining=cls.topics.filter(t=>!r.order.includes(t.id));
+        cls.topics=[...ordered,...remaining];
+      });
+
+      _aiPlan.moves.forEach(mv=>{
+        const from=getCls(mv.fromClassId), to=getCls(mv.toClassId);
+        if(!from||!to) return;
+        const idx=from.topics.findIndex(t=>t.id===mv.topicId);
+        if(idx===-1) return;
+        const [topic]=from.topics.splice(idx,1);
+        assignTopicToStrand(from.id,topic.id,null); // clear its thread link — it belonged to the old year's thread set
+        to.topics.push(topic);
+      });
+
+      [...touchedIds].forEach(id=>{const c=getCls(id); if(c) relayoutClassTopics(c);});
+      persistCurriculumChanges([...touchedIds]);
+      _aiPlan=null;
+      showToast('✅ AI suggestions applied and saved.');
+      renderAIReview();
+    },
+    null,
+    {okLabel:'Apply suggestions'}
+  );
+}
+function undoAIPlan(){
+  if(!_lastAIPlanBackup){showToast('Nothing to undo.');return;}
+  const ids=_lastAIPlanBackup.classes.map(b=>b.id);
+  _lastAIPlanBackup.classes.forEach(b=>{const c=getCls(b.id); if(c) c.topics=b.topics;});
+  persistCurriculumChanges(ids);
+  _lastAIPlanBackup=null;
+  showToast('↩ Reverted AI changes.');
+  renderAIReview();
 }
 
 function showShortcuts(){
