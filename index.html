@@ -7565,7 +7565,7 @@ function renderModal(){
      until the HoD activates a plan.
 ════════════════════════════════════════════════════════ -->
 <style>
-#lf-billing-banner{position:fixed;bottom:0;left:0;right:0;z-index:600;background:linear-gradient(90deg,#170e4a 0%,#0f1e44 100%);border-top:1px solid rgba(124,99,248,.4);padding:10px 20px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text2);transform:translateY(100%);transition:transform .3s ease;}
+#lf-billing-banner{position:fixed;bottom:0;left:0;right:0;z-index:650;background:linear-gradient(90deg,#170e4a 0%,#0f1e44 100%);border-top:1px solid rgba(124,99,248,.4);box-shadow:0 -4px 16px rgba(0,0,0,.35);padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text2);transform:translateY(100%);transition:transform .3s ease;flex-wrap:wrap;}
 #lf-billing-banner.show{transform:translateY(0);}
 #lf-billing-banner .bb-msg{flex:1;}
 #lf-billing-banner .bb-msg strong{color:var(--text);font-size:13px;}
@@ -7763,25 +7763,24 @@ const lfBilling = (() => {
   return { init, openModal, closeModal, checkout, selectPlan, checkStatus };
 })();
 
-// Hook into app boot — called after the existing init block
-document.addEventListener('DOMContentLoaded', () => {
-  // lfBilling.init() is also called from the main boot block override below
-});
-
-// Override: trigger billing init after the app's own boot completes
-const _origRender = typeof render === 'function' ? render : null;
+// Trigger billing init once the HoD is logged in. Previously this waited
+// for a MutationObserver to catch a childList change on #content — but that
+// only fires on the specific renders it happened to be watching, so a
+// returning HoD whose session restore didn't trigger the right kind of
+// re-render could go an entire visit without ever having their billing
+// status checked (the paywall banner would just never appear). Polling
+// localStorage directly is a few bytes of work per second and can't miss.
 let _billingInitialized = false;
-if (_origRender) {
-  const __patchBillingInit = () => {
-    if (!_billingInitialized && isHoDLoggedIn && isHoDLoggedIn()) {
-      _billingInitialized = true;
-      lfBilling.init();
-    }
-  };
-  // Patch via a tiny observer so we don't touch the original render function
-  const _billingObserver = new MutationObserver(__patchBillingInit);
-  _billingObserver.observe(document.getElementById('content') || document.body, { childList: true, subtree: false });
+function _tryBillingInit() {
+  if (_billingInitialized) return;
+  if (typeof isHoDLoggedIn === 'function' && isHoDLoggedIn()) {
+    _billingInitialized = true;
+    clearInterval(_billingPoll);
+    lfBilling.init();
+  }
 }
+const _billingPoll = setInterval(_tryBillingInit, 1000);
+_tryBillingInit(); // in case already logged in at script-run time
 
 function isHoDLoggedIn() {
   return localStorage.getItem(LF_TID_KEY) === 'hod' &&
