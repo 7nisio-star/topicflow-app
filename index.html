@@ -1060,6 +1060,20 @@ const Config={
 Object.freeze(Config); // prevent accidental mutation
 
 const DEMO=['Ms Smith','Mr Patel','Ms Johnson','Mr Brown']; // demo teacher names
+
+// Removes the seeded demo teachers from T. seedDemo() runs on every fresh
+// browser (empty T) so a first-time visitor has something to look at before
+// they've set anything up — but once someone actually connects to a real
+// department (HoD create/login, teacher join, or a returning server session),
+// those fake names have no business sticking around in their dashboard. Safe
+// to call any time; it's a no-op once they're already gone.
+function clearDemoTeachers(){
+  let changed=false;
+  DEMO.forEach(name=>{
+    if(T[name]&&name!==U){delete T[name];changed=true;}
+  });
+  if(changed) savT();
+}
 const AV_COLS=['#6c56f5','#00c9a7','#ff4f6e','#ffaa40','#3dce7a','#4a8fe0','#9b72e0','#ff6b4a','#e05a5a','#e0b840'];
 function avCol(n){let h=0;for(let c of n)h=(h*31+c.charCodeAt(0))&0xffff;return AV_COLS[h%AV_COLS.length];}
 
@@ -1281,6 +1295,8 @@ var _trapStack=[];
       if(!hasConfig){try{localStorage.setItem(CFG_KEY,JSON.stringify({setupComplete:true}));}catch(e){}}
       // Ensure role stored locally matches server payload
       if(me.role) setRole(me.role);
+      if(me.name) U=me.name;
+      clearDemoTeachers();
       if(getRole()==='teacher'){
         startProgressAutosave();
         syncSoWFromServer().then(()=>render()).catch(()=>render());
@@ -1786,6 +1802,9 @@ async function loadFromLocalFolder(){
 
 /* ════ HoD CURRICULUM EDITOR ════ */
 let CE={cls:null, dragging:null, holidays:[]};
+// Backup of a class's topic order/weeks before suggestThreadOrder() applies a
+// new order, so undoThreadOrder() can restore it. {clsId, topics:[...]} or null.
+let _lastThreadOrderBackup=null;
 function openCurricEditor(clsId){
   if(!isHoD()){showToast('Curriculum editing is HoD-only.');return;}
   CE.cls=getCls(clsId)||allCls()[0];
@@ -1809,6 +1828,8 @@ function renderCurricEditor(){
   const cw=getCW();
   const weeks=Array.from({length:40},(_,i)=>i+1);
   const topics=cls.topics;
+  const strands=getStrands(cls.id);
+  const hasUndoSuggestion=_lastThreadOrderBackup&&_lastThreadOrderBackup.clsId===cls.id;
 
   // Assign topics to week slots for display
   const weekMap={};
@@ -1866,6 +1887,8 @@ function renderCurricEditor(){
       </select>
       ${hod?'<button onclick="ceAddTopic(null)" class="btna btn" style="font-size:12px;">+ Add topic</button>':''}
       ${hod?'<button onclick="ceImportFromExcel()" class="btn" style="font-size:12px;">📥 Import Excel</button>':''}
+      ${hod?'<button onclick="renderStrandManager()" class="btn" style="font-size:12px;">🗂 Golden threads</button>':''}
+      ${hod?'<button onclick="suggestThreadOrder()" class="btn" style="font-size:12px;">✨ Suggest order</button>':''}
       ${hod?'<button onclick="saveCurric()" class="btna btn" style="font-size:12px;margin-left:auto;">💾 Save</button>':''}
     </div>
 
@@ -1874,6 +1897,9 @@ function renderCurricEditor(){
     </div>`:`<div style="font-size:11px;color:var(--amber);margin-bottom:10px;padding:6px 10px;background:rgba(255,176,64,.08);border-radius:6px;border:1px solid rgba(255,176,64,.2);">
       👁 Read-only view — contact your HoD to make changes to the curriculum.
     </div>`}
+    ${hasUndoSuggestion?`<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);margin-bottom:10px;padding:7px 10px;background:var(--panel2);border-radius:8px;">
+      ✨ Order suggested based on golden threads. <button onclick="undoThreadOrder()" class="btn" style="font-size:11px;padding:3px 9px;">↩ Undo suggestion</button>
+    </div>`:''}
 
     <!-- Week legend row -->
     <div style="display:flex;gap:2px;margin-bottom:4px;overflow-x:auto;">
@@ -1901,6 +1927,15 @@ function renderCurricEditor(){
         ${hod
           ?`<input value="${t.name}" class="sfield" style="flex:1;font-size:12px;" onchange="ceRename('${t.id}',this.value)">`
           :`<span style="flex:1;font-size:12px;color:var(--text1);padding:4px 6px;">${esc(t.name)}</span>`}
+        ${(()=>{const st=getTopicStrand(cls.id,t.id);
+          if(hod) return `<select class="sfield" style="font-size:10px;padding:3px 4px;width:auto;max-width:120px;flex-shrink:0;${st?`border-color:${st.color};color:${st.color};`:''}" title="Golden thread" onchange="ceSetTopicThread('${cls.id}','${t.id}',this.value)">
+              <option value="">— thread —</option>
+              ${strands.map(s=>`<option value="${s.id}" ${st&&st.id===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
+              ${THREAD_PRESETS.filter(p=>!strands.some(s=>s.name.toLowerCase()===p.toLowerCase())).map(p=>`<option value="__preset__:${esc(p)}">+ ${esc(p)}</option>`).join('')}
+              <option value="__manage__">🗂 Manage threads…</option>
+            </select>`;
+          return st?`<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${st.color}22;color:${st.color};border:1px solid ${st.color}55;flex-shrink:0;">${esc(st.name)}</span>`:'';
+        })()}
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
           <span style="font-size:11px;color:var(--text3);">W${t.start}–${t.end}</span>
           ${hod?`<button onclick="ceSetDur('${t.id}',-1)" class="btn" style="font-size:11px;padding:2px 7px;">−</button>`:''}
@@ -2017,8 +2052,13 @@ function ceImportFromExcel(){
 /* ════════════════════════════════════════════════════════
    TEACHER ROSTER
 ════════════════════════════════════════════════════════ */
-/* ════ STRAND / TOPIC GROUPING SYSTEM ════ */
+/* ════ STRAND / TOPIC GROUPING SYSTEM ════
+   "Strands" are what the UI calls "Golden Threads" — recurring curriculum
+   strands (Number, Algebra, Geometry…) that run across topics/years. Kept
+   the original internal name to avoid touching every call site; only the
+   user-facing text says "Golden Threads" now. */
 const STRAND_COLORS=['#6c56f5','#00c9a7','#ffaa40','#ff4f6e','#3d8ef5','#9b72e0','#e05a8a','#f5a623'];
+const THREAD_PRESETS=['Number','Algebra','Ratio & Proportion','Geometry & Measure','Statistics & Probability'];
 function getStrands(clsId){try{const all=JSON.parse(localStorage.getItem(STRAND_KEY)||'{}');return all[clsId]||[];}catch(e){return [];}}
 function saveStrands(clsId,strands){try{const all=JSON.parse(localStorage.getItem(STRAND_KEY)||'{}');all[clsId]=strands;localStorage.setItem(STRAND_KEY,JSON.stringify(all));}catch(e){}}
 function getTopicStrand(clsId,topicId){if(!clsId) return null;
@@ -2041,15 +2081,16 @@ function renderStrandManager(){
   co.innerHTML=`<div style="max-width:860px;margin:0 auto;padding:20px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
       <button onclick="goBack()" class="btn" style="font-size:12px;">← Back</button>
-      <div style="font-size:17px;font-weight:700;">🗂 Topic Strands — ${cls.name}</div>
+      <div style="font-size:17px;font-weight:700;">🗂 Golden Threads — ${cls.name}</div>
       <select onchange="YID=this.value;renderStrandManager()" class="sfield" style="font-size:12px;padding:5px 10px;margin-left:auto;">
         ${allCls().map(c2=>`<option value="${c2.id}"${c2.id===cls.id?' selected':''}>${c2.name}</option>`).join('')}
       </select>
     </div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Group topics into curriculum strands (e.g. Number, Algebra, Geometry).</div>
-    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:12px;padding:12px;margin-bottom:14px;display:flex;gap:8px;">
-      <input id="new-strand-name" class="sfield" placeholder="New strand name e.g. Number, Algebra, Geometry…" style="flex:1;">
-      <button onclick="(function(){const n=document.getElementById('new-strand-name').value.trim();if(!n)return;addStrand('${cls.id}',n);renderStrandManager();})()" class="btna btn" style="font-size:12px;">+ Add strand</button>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Group topics into recurring curriculum threads (e.g. Number, Algebra, Geometry) that build across the year. Use "✨ Suggest order" in the Curriculum Editor to interleave them automatically.</div>
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:12px;padding:12px;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
+      <input id="new-strand-name" class="sfield" placeholder="New thread name e.g. Number, Algebra, Geometry…" style="flex:1;min-width:180px;">
+      <button onclick="(function(){const n=document.getElementById('new-strand-name').value.trim();if(!n)return;addStrand('${cls.id}',n);renderStrandManager();})()" class="btna btn" style="font-size:12px;">+ Add thread</button>
+      ${THREAD_PRESETS.filter(p=>!strands.some(s=>s.name.toLowerCase()===p.toLowerCase())).map(p=>`<button onclick="addStrand('${cls.id}','${p.replace(/'/g,"\\'")}');renderStrandManager();" class="btn" style="font-size:11px;">+ ${esc(p)}</button>`).join('')}
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-bottom:18px;">
       ${strands.map(strand=>`<div style="background:var(--panel);border:1px solid var(--border);border-left:4px solid ${strand.color};border-radius:10px;padding:12px;">
@@ -2081,18 +2122,81 @@ function renderStrandManager(){
           <span>${t.name}</span>
           <select onchange="(function(sel){if(!sel.value)return;assignTopicToStrand('${cls.id}','${t.id}',sel.value);sel.value='';renderStrandManager();})(this)"
             style="font-size:11px;background:transparent;border:none;color:var(--acc);cursor:pointer;">
-            <option value="">→ strand</option>
+            <option value="">→ thread</option>
             ${strands.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
           </select>
         </div>`).join('')}
       </div>
     </div>`:'<div style="font-size:12px;color:var(--teal);padding:8px 0;">✓ All topics assigned.</div>'}
-    ${strands.length?`<div class="divider"></div><div style="font-size:13px;font-weight:700;margin-bottom:10px;">Strand overview</div>
+    ${strands.length?`<div class="divider"></div><div style="font-size:13px;font-weight:700;margin-bottom:10px;">Golden Thread overview</div>
     ${strands.map(s=>{const topics=(s.topicIds||[]).map(tid=>cls.topics.find(t=>t.id===tid)).filter(Boolean);const tw=topics.reduce((sum,t)=>sum+(t.end-t.start+1),0);const pw=Math.round(tw/PD.weeks*100);
       return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><div style="width:110px;font-size:12px;font-weight:600;color:${s.color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div><div style="flex:1;height:10px;background:var(--panel2);border-radius:5px;overflow:hidden;"><div style="height:100%;width:${pw}%;background:${s.color};border-radius:5px;"></div></div><div style="font-size:11px;color:var(--text2);width:90px;text-align:right;">${topics.length}t · ${tw}w (${pw}%)</div></div>`;}).join('')}`:''}
   </div>`;
 }
 
+// Handles the per-topic golden-thread dropdown in the Curriculum Editor's
+// topic list. val is either '' (unassign), an existing strand id, a new
+// preset ('__preset__:Name'), or '__manage__' (open the full manager).
+function ceSetTopicThread(clsId,topicId,val){
+  if(val==='__manage__'){renderStrandManager();return;}
+  if(val===''){assignTopicToStrand(clsId,topicId,null);renderCurricEditor();return;}
+  if(val.indexOf('__preset__:')===0){
+    const name=val.slice('__preset__:'.length);
+    const id=addStrand(clsId,name);
+    assignTopicToStrand(clsId,topicId,id);
+    renderCurricEditor();
+    return;
+  }
+  assignTopicToStrand(clsId,topicId,val);
+  renderCurricEditor();
+}
+
+// Proposes a full week-by-week reorder of the current class's topics,
+// interleaving them by golden thread (spiral curriculum) round-robin style
+// instead of clustering each thread together. Topics with no thread are
+// treated as their own bucket and interleaved in too. Backs up the current
+// order first so undoThreadOrder() can restore it.
+function suggestThreadOrder(){
+  if(!isHoD()){showToast('Curriculum is read-only. Only your HoD can make changes.');return;}
+  const cls=CE.cls;
+  if(!cls||!cls.topics.length){showToast('Add some topics first.');return;}
+  const strands=getStrands(cls.id);
+  const buckets=strands.map(s=>cls.topics.filter(t=>(s.topicIds||[]).includes(t.id))).filter(b=>b.length);
+  const unassigned=cls.topics.filter(t=>!getTopicStrand(cls.id,t.id));
+  if(unassigned.length) buckets.push(unassigned);
+  if(buckets.length<2){showToast('Assign topics to at least 2 golden threads to suggest an interleaved order.');return;}
+  showConfirm(
+    'Suggest a new week-by-week order that interleaves topics across golden threads (spiral curriculum)? Weeks will be recalculated. You can undo this.',
+    function(){
+      _lastThreadOrderBackup={clsId:cls.id,topics:JSON.parse(JSON.stringify(cls.topics))};
+      const newOrder=[];
+      let remaining=true;
+      while(remaining){
+        remaining=false;
+        for(const b of buckets){
+          if(b.length){newOrder.push(b.shift());if(b.length) remaining=true;}
+        }
+      }
+      cls.topics=newOrder;
+      ceRelayout();
+      renderCurricEditor();
+      showToast('✨ Suggested order applied. Click "💾 Save" to keep it, or "↩ Undo suggestion" to revert.');
+    },
+    null,
+    {okLabel:'Suggest order',danger:false}
+  );
+}
+
+// Reverts the class's topic order/weeks to what they were immediately
+// before suggestThreadOrder() last applied a suggestion for this class.
+function undoThreadOrder(){
+  const cls=CE.cls;
+  if(!cls||!_lastThreadOrderBackup||_lastThreadOrderBackup.clsId!==cls.id){showToast('Nothing to undo.');return;}
+  cls.topics=_lastThreadOrderBackup.topics;
+  _lastThreadOrderBackup=null;
+  renderCurricEditor();
+  showToast('↩ Reverted to previous order.');
+}
 
 function showShortcuts(){
   if(document.getElementById('sc-ov')) return;
@@ -6631,6 +6735,7 @@ async function lfHoDCreate(){
     localStorage.setItem(LF_TID_KEY,'hod');
     setRole('hod');
     U=sd.hodName; savU();
+    clearDemoTeachers();
     if(!T[U]) T[U]={name:U,progress:{},gaps:[]};
     sd.joinCode=res.code; sd.groupCreated=true; sd.serverBusy=false;
     try{localStorage.setItem(CFG_KEY,JSON.stringify({setupComplete:true,authType:'server',role:'hod'}));}catch(e){}
@@ -6659,6 +6764,7 @@ async function lfHoDLogin(){
     localStorage.setItem(LF_TID_KEY,'hod');
     setRole('hod');
     U=res.hodName||sd.hodName||''; savU();
+    clearDemoTeachers();
     if(!T[U]) T[U]={name:U,progress:{},gaps:[]};
     sd.joinCode=res.code; sd.groupCreated=true; sd.serverBusy=false;
     try{localStorage.setItem(CFG_KEY,JSON.stringify({setupComplete:true,authType:'server',role:'hod'}));}catch(e){}
@@ -6687,6 +6793,7 @@ async function lfTeacherJoin(){
     localStorage.setItem(LF_TID_KEY,String(res.teacher.id));
     setRole('teacher');
     U=name; savU();
+    clearDemoTeachers();
     if(!T[U]) T[U]={name:U,progress:{},gaps:[]};
     savePrefs({avatarColor:sd.avatarColor||'#7c63f8'});
     sd.serverBusy=false;
