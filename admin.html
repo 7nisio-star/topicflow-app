@@ -7,113 +7,265 @@
 <title>TopicFlow — Admin</title>
 <style>
   :root{
-    --bg:#0f1117; --panel:#171a24; --panel2:#1d2130; --border:rgba(124,99,248,.25);
+    --bg:#0b0d13; --bg2:#0f1117;
+    --panel:#151824; --panel2:#1b1f2e; --panel3:#22273a;
+    --border:rgba(124,99,248,.22); --border-soft:rgba(255,255,255,.06);
     --text:#f2f3f7; --text2:#aab0c6; --text3:#6b7288;
-    --acc:#7c63f8; --acc2:#4fd1a5; --red:#ff5c7a;
+    --acc:#7c63f8; --acc-glow:rgba(124,99,248,.35);
+    --acc2:#4fd1a5; --acc2-glow:rgba(79,209,165,.25);
+    --red:#ff5c7a; --amber:#f5b95a;
+    --radius:16px;
   }
   *{box-sizing:border-box;}
+  ::selection{background:var(--acc);color:#fff;}
   body{
-    margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-    background:var(--bg); color:var(--text); min-height:100vh;
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    background:
+      radial-gradient(1100px 500px at 15% -10%, rgba(124,99,248,.10), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(79,209,165,.06), transparent 55%),
+      var(--bg);
+    background-attachment:fixed;
+    color:var(--text); min-height:100vh; -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:960px;margin:0 auto;padding:40px 20px 80px;}
-  .logo{font-size:20px;font-weight:700;margin-bottom:4px;}
-  .logo span{color:var(--acc2);}
-  .sub{color:var(--text3);font-size:13px;margin-bottom:32px;}
+  .wrap{max-width:1020px;margin:0 auto;padding:36px 20px 90px;}
+
+  .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:34px;flex-wrap:wrap;gap:12px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand-mark{
+    width:38px;height:38px;border-radius:11px;flex-shrink:0;
+    background:linear-gradient(135deg,var(--acc),#5a3fe0);
+    box-shadow:0 4px 18px var(--acc-glow);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;
+  }
+  .brand-text .logo{font-size:19px;font-weight:800;letter-spacing:-.01em;line-height:1.2;}
+  .brand-text .logo span{color:var(--acc2);}
+  .brand-text .sub{color:var(--text3);font-size:12.5px;}
+  .env-pill{
+    font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    padding:4px 10px;border-radius:20px;color:var(--amber);background:rgba(245,185,90,.1);
+    border:1px solid rgba(245,185,90,.25);
+  }
 
   /* Gate */
-  #gate{max-width:360px;margin:80px auto;text-align:center;}
+  #gate{max-width:380px;margin:11vh auto 0;text-align:center;}
+  #gate .gate-mark{
+    width:52px;height:52px;border-radius:14px;margin:0 auto 18px;
+    background:linear-gradient(135deg,var(--acc),#5a3fe0);
+    box-shadow:0 10px 30px var(--acc-glow);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;
+  }
+  #gate h2{font-size:17px;margin:0 0 6px;}
+  #gate .desc{color:var(--text3);font-size:12.5px;margin-bottom:20px;}
+  .key-field{position:relative;}
   #gate input{
-    width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);
-    background:var(--panel);color:var(--text);font-size:14px;margin:16px 0 10px;
+    width:100%;padding:13px 44px 13px 15px;border-radius:11px;border:1px solid var(--border-soft);
+    background:var(--panel2);color:var(--text);font-size:14px;
+    transition:border-color .15s,box-shadow .15s;
   }
-  #gate button, .btn{
-    width:100%;padding:12px 14px;border-radius:10px;border:none;
-    background:var(--acc);color:#fff;font-weight:600;font-size:14px;cursor:pointer;
+  #gate input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-glow);}
+  .key-toggle{
+    position:absolute;right:6px;top:6px;bottom:6px;width:32px;border:none;background:none;
+    color:var(--text3);cursor:pointer;font-size:14px;border-radius:8px;
   }
-  #gate button:hover, .btn:hover{filter:brightness(1.08);}
-  #gate .err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px;}
-  .remember{display:flex;align-items:center;gap:6px;justify-content:center;color:var(--text3);font-size:12px;margin-top:10px;}
+  .key-toggle:hover{color:var(--text2);background:rgba(255,255,255,.05);}
+  #gate button.btn{margin-top:14px;}
+  .btn{
+    padding:12px 16px;border-radius:11px;border:none;
+    background:linear-gradient(135deg,var(--acc),#6b52ef);color:#fff;font-weight:600;font-size:14px;cursor:pointer;
+    transition:filter .15s,transform .05s;
+  }
+  .btn:hover{filter:brightness(1.1);}
+  .btn:active{transform:scale(.98);}
+  #gate .err{color:var(--red);font-size:12px;margin-top:10px;min-height:16px;}
+  .remember{display:flex;align-items:center;gap:7px;justify-content:center;color:var(--text3);font-size:12.5px;margin-top:14px;}
+  .remember input{width:auto;accent-color:var(--acc);}
 
   /* Dashboard */
   #dash{display:none;}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:28px;}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px;}
-  .card .n{font-size:28px;font-weight:700;}
-  .card .l{color:var(--text3);font-size:12px;margin-top:4px;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:26px;}
+  .card{
+    background:linear-gradient(160deg,var(--panel),var(--panel2));
+    border:1px solid var(--border-soft);border-radius:var(--radius);padding:20px;
+    position:relative;overflow:hidden;transition:transform .15s,border-color .15s;
+  }
+  .card:hover{transform:translateY(-2px);border-color:var(--border);}
+  .card .ic{
+    position:absolute;top:16px;right:16px;font-size:17px;opacity:.5;
+  }
+  .card .n{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
+  .card .l{color:var(--text3);font-size:12px;margin-top:6px;}
+  .card.acc .n{color:var(--acc2);}
+  .card .bar{height:4px;border-radius:3px;background:var(--panel3);margin-top:12px;overflow:hidden;}
+  .card .bar-fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px;transition:width .4s ease;}
 
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;}
-  .panel h2{font-size:15px;margin:0 0 4px;}
-  .panel .desc{color:var(--text3);font-size:12px;margin-bottom:16px;}
+  .panel{
+    background:linear-gradient(160deg,var(--panel),var(--panel2));
+    border:1px solid var(--border-soft);border-radius:var(--radius);padding:22px;margin-bottom:20px;
+  }
+  .panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:4px;flex-wrap:wrap;}
+  .panel h2{font-size:15.5px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .panel .desc{color:var(--text3);font-size:12.5px;margin-bottom:16px;max-width:640px;line-height:1.5;}
 
-  table{width:100%;border-collapse:collapse;font-size:13px;}
-  th{text-align:left;color:var(--text3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;padding:8px 10px;border-bottom:1px solid var(--border);}
-  td{padding:10px;border-bottom:1px solid rgba(255,255,255,.05);}
+  .search-box{position:relative;min-width:200px;}
+  .search-box input{
+    width:100%;padding:8px 12px 8px 30px;border-radius:9px;border:1px solid var(--border-soft);
+    background:var(--panel3);color:var(--text);font-size:12.5px;
+  }
+  .search-box input:focus{outline:none;border-color:var(--acc);}
+  .search-box:before{
+    content:'🔎';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:11px;opacity:.6;
+  }
+
+  .table-scroll{overflow-x:auto;border-radius:10px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px;}
+  th{
+    text-align:left;color:var(--text3);font-weight:700;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.04em;padding:9px 10px;border-bottom:1px solid var(--border-soft);white-space:nowrap;
+  }
+  td{padding:11px 10px;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:middle;}
+  tbody tr{transition:background .12s;}
+  tbody tr:hover{background:rgba(255,255,255,.02);}
   tr:last-child td{border-bottom:none;}
-  .code{font-family:monospace;background:var(--panel2);padding:2px 6px;border-radius:6px;letter-spacing:.05em;}
-  .empty{color:var(--text3);font-size:13px;text-align:center;padding:24px 0;}
+  .hod-name{font-weight:600;}
+  .code-chip{display:inline-flex;align-items:center;gap:6px;}
+  .code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--panel3);
+    padding:3px 8px;border-radius:6px;letter-spacing:.06em;font-size:12px;border:1px solid var(--border-soft);
+  }
+  .copy-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:5px;}
+  .copy-btn:hover{color:var(--acc2);background:rgba(255,255,255,.05);}
+  .time-primary{white-space:nowrap;}
+  .time-rel{color:var(--text3);font-size:11px;}
+  .empty{color:var(--text3);font-size:13px;text-align:center;padding:40px 0;}
+  .empty .big{font-size:26px;margin-bottom:8px;opacity:.5;}
 
   .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+  .toggle-row .label{font-size:13.5px;font-weight:600;}
   .switch{position:relative;width:46px;height:26px;flex-shrink:0;}
   .switch input{opacity:0;width:0;height:0;}
-  .slider{position:absolute;inset:0;background:#31364a;border-radius:26px;cursor:pointer;transition:.2s;}
-  .slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
-  .switch input:checked + .slider{background:var(--acc);}
+  .slider{position:absolute;inset:0;background:#2a2f42;border-radius:26px;cursor:pointer;transition:.2s;}
+  .slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .switch input:checked + .slider{background:linear-gradient(135deg,var(--acc),#6b52ef);}
   .switch input:checked + .slider:before{transform:translateX(20px);}
-  .status-msg{font-size:12px;color:var(--acc2);margin-top:10px;min-height:14px;}
+  .status-msg{font-size:12px;color:var(--acc2);margin-top:12px;min-height:14px;transition:opacity .2s;}
+  .paywall-state{
+    display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 9px;
+    border-radius:20px;text-transform:uppercase;letter-spacing:.03em;margin-left:8px;
+  }
+  .paywall-state.on{color:var(--amber);background:rgba(245,185,90,.1);}
+  .paywall-state.off{color:var(--acc2);background:var(--acc2-glow);}
 
-  .refresh{background:none;border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;}
-  .refresh:hover{color:var(--text);}
-  .badge{font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;font-weight:700;}
-  .badge.active{color:var(--acc2);background:rgba(79,209,165,.12);}
+  .refresh{
+    background:var(--panel3);border:1px solid var(--border-soft);color:var(--text2);border-radius:9px;
+    padding:7px 14px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s;
+  }
+  .refresh:hover{color:var(--text);border-color:var(--acc);}
+  .refresh.spinning .spin-ic{display:inline-block;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .badge{font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:20px;font-weight:700;}
+  .badge.active{color:var(--acc2);background:var(--acc2-glow);}
   .badge.archived{color:var(--text3);background:rgba(255,255,255,.06);}
-  tr.archived-row td{opacity:.55;}
-  .mini-btn{background:none;border:1px solid var(--border);color:var(--text2);border-radius:7px;padding:4px 10px;font-size:11px;cursor:pointer;white-space:nowrap;}
-  .mini-btn:hover{color:var(--text);border-color:var(--acc);}
-  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
-  .loading{color:var(--text3);font-size:13px;}
+  tr.archived-row td{opacity:.5;}
+  .mini-btn{
+    background:none;border:1px solid var(--border-soft);color:var(--text2);border-radius:8px;
+    padding:5px 11px;font-size:11px;cursor:pointer;white-space:nowrap;transition:all .15s;
+  }
+  .mini-btn:hover{color:var(--text);border-color:var(--acc);background:rgba(124,99,248,.08);}
+  .mini-btn.danger:hover{color:var(--red);border-color:var(--red);background:rgba(255,92,122,.08);}
+
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:10px;}
+  .loading{color:var(--text3);font-size:12.5px;display:flex;align-items:center;gap:6px;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--acc2);box-shadow:0 0 6px var(--acc2-glow);}
+
+  /* skeleton loading */
+  .skel{display:inline-block;height:1em;width:2.4em;border-radius:6px;background:linear-gradient(90deg,var(--panel3) 25%,rgba(255,255,255,.08) 37%,var(--panel3) 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;}
+  @keyframes shimmer{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+
+  /* toast */
+  #toast-wrap{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:8px;align-items:center;}
+  .toast{
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);font-size:13px;
+    padding:11px 18px;border-radius:11px;box-shadow:0 10px 30px rgba(0,0,0,.4);
+    opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;max-width:90vw;
+  }
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.err{border-color:rgba(255,92,122,.4);}
+
+  footer.meta{text-align:center;color:var(--text3);font-size:11px;margin-top:36px;}
+
+  @media (max-width:520px){
+    .wrap{padding:24px 14px 80px;}
+    .header{margin-bottom:24px;}
+    table{min-width:560px;}
+  }
 </style>
 </head>
 <body>
+<div id="toast-wrap"></div>
 <div class="wrap">
-  <div class="logo">Topic<span>Flow</span> — Admin</div>
-  <div class="sub">Internal dashboard. Not linked from the app.</div>
+  <div class="header">
+    <div class="brand">
+      <div class="brand-mark">T</div>
+      <div class="brand-text">
+        <div class="logo">Topic<span>Flow</span> — Admin</div>
+        <div class="sub">Internal dashboard · not linked from the app</div>
+      </div>
+    </div>
+    <div class="env-pill" id="dash-only" style="display:none;">Live data</div>
+  </div>
 
   <div id="gate">
-    <div class="panel">
-      <h2>Enter admin key</h2>
-      <div class="desc">Set via the ADMIN_KEY environment variable in Netlify.</div>
-      <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off">
-      <button class="btn" onclick="unlock()">Unlock</button>
+    <div class="gate-mark">T</div>
+    <div class="panel" style="text-align:left;">
+      <h2 style="text-align:center;">Enter admin key</h2>
+      <div class="desc" style="text-align:center;">Set via the <code style="color:var(--acc2);">ADMIN_KEY</code> environment variable in Netlify.</div>
+      <div class="key-field">
+        <input type="password" id="admin-key" placeholder="Admin key" autocomplete="off" onkeydown="if(event.key==='Enter')unlock()">
+        <button class="key-toggle" type="button" onclick="toggleKeyVisibility()" id="key-toggle-btn" aria-label="Show key">👁</button>
+      </div>
+      <button class="btn" style="width:100%;" onclick="unlock()">Unlock →</button>
       <div class="err" id="gate-err"></div>
-      <label class="remember"><input type="checkbox" id="remember" checked style="width:auto;"> Remember on this device</label>
+      <label class="remember"><input type="checkbox" id="remember" checked> Remember on this device</label>
     </div>
   </div>
 
   <div id="dash">
     <div class="topbar">
-      <div class="loading" id="last-refreshed"></div>
-      <button class="refresh" onclick="loadStats()">↻ Refresh</button>
+      <div class="loading" id="last-refreshed"><span class="dot"></span>Loading…</div>
+      <button class="refresh" onclick="loadStats()" id="refresh-btn"><span class="spin-ic">↻</span> Refresh</button>
     </div>
 
     <div class="cards">
-      <div class="card"><div class="n" id="stat-groups">–</div><div class="l">Active departments</div></div>
-      <div class="card"><div class="n" id="stat-teachers">–</div><div class="l">Teachers</div></div>
-      <div class="card"><div class="n" id="stat-cap">–</div><div class="l">Of ~200 teacher capacity</div></div>
-      <div class="card"><div class="n" id="stat-archived">–</div><div class="l">Archived</div></div>
+      <div class="card"><span class="ic">🏫</span><div class="n" id="stat-groups"><span class="skel"></span></div><div class="l">Active departments</div></div>
+      <div class="card acc"><span class="ic">👩‍🏫</span><div class="n" id="stat-teachers"><span class="skel"></span></div><div class="l">Teachers</div></div>
+      <div class="card">
+        <span class="ic">📊</span>
+        <div class="n" id="stat-cap"><span class="skel"></span></div>
+        <div class="l">Of ~200 teacher capacity</div>
+        <div class="bar"><div class="bar-fill" id="stat-cap-bar" style="width:0%;"></div></div>
+      </div>
+      <div class="card"><span class="ic">📦</span><div class="n" id="stat-archived"><span class="skel"></span></div><div class="l">Archived</div></div>
     </div>
 
     <div class="panel">
-      <h2>Departments</h2>
-      <div class="desc">Every group created so far, most recently active first. Archiving frees up a join code from your active count without deleting its data.</div>
-      <div id="groups-table"></div>
+      <div class="panel-head">
+        <div>
+          <h2>Departments</h2>
+          <div class="desc">Every group created so far, most recently active first. Archiving frees up a join code from your active count without deleting its data.</div>
+        </div>
+        <div class="search-box">
+          <input type="text" id="dept-search" placeholder="Search HoD or code…" oninput="renderGroupsTable()">
+        </div>
+      </div>
+      <div class="table-scroll" id="groups-table"></div>
     </div>
 
     <div class="panel">
-      <h2>Paywall</h2>
+      <h2>Paywall <span class="paywall-state off" id="paywall-state-badge">Off</span></h2>
       <div class="desc">Toggle on to show every HoD an "upgrade" banner and require payment. Stripe Checkout is live (test mode) — switch to live keys before turning this on for real schools.</div>
       <div class="toggle-row">
-        <div>Paywall enabled</div>
+        <div class="label">Paywall enabled</div>
         <label class="switch">
           <input type="checkbox" id="paywall-toggle" onchange="togglePaywall()">
           <span class="slider"></span>
@@ -121,17 +273,54 @@
       </div>
       <div class="status-msg" id="paywall-msg"></div>
     </div>
+
+    <footer class="meta">TopicFlow Admin · data served from Netlify Blobs</footer>
   </div>
 </div>
 
 <script>
 const KEY_STORAGE = 'lf_admin_key';
 let ADMIN_KEY = '';
+let LAST_GROUPS = [];
+
+function toast(msg, isErr){
+  const wrap = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = 'toast' + (isErr ? ' err' : '');
+  el.textContent = msg;
+  wrap.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{
+    el.classList.remove('show');
+    setTimeout(()=>el.remove(), 250);
+  }, 3200);
+}
+
+function toggleKeyVisibility(){
+  const input = document.getElementById('admin-key');
+  const btn = document.getElementById('key-toggle-btn');
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? '👁' : '🙈';
+}
 
 function fmtDate(ts){
   if(!ts) return '—';
   const d = new Date(ts);
   return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+}
+
+function fmtRelative(ts){
+  if(!ts) return '';
+  const diff = Date.now() - ts;
+  const min = Math.round(diff/60000);
+  if(min < 1) return 'just now';
+  if(min < 60) return min + 'm ago';
+  const hr = Math.round(min/60);
+  if(hr < 24) return hr + 'h ago';
+  const day = Math.round(hr/24);
+  if(day < 30) return day + 'd ago';
+  return Math.round(day/30) + 'mo ago';
 }
 
 function fmtBilling(g){
@@ -168,6 +357,7 @@ async function unlock(){
     }
     document.getElementById('gate').style.display = 'none';
     document.getElementById('dash').style.display = 'block';
+    document.getElementById('dash-only').style.display = 'inline-block';
     loadStats();
     loadSettings();
   }catch(e){
@@ -175,45 +365,73 @@ async function unlock(){
   }
 }
 
-async function loadStats(){
+function renderGroupsTable(){
   const tableEl = document.getElementById('groups-table');
-  document.getElementById('last-refreshed').textContent = 'Loading…';
+  const q = (document.getElementById('dept-search').value || '').trim().toLowerCase();
+  const groups = !q ? LAST_GROUPS : LAST_GROUPS.filter(g =>
+    (g.hodName||'').toLowerCase().includes(q) || (g.code||'').toLowerCase().includes(q)
+  );
+
+  if(!LAST_GROUPS.length){
+    tableEl.innerHTML = '<div class="empty"><div class="big">🏫</div>No departments yet.</div>';
+    return;
+  }
+  if(!groups.length){
+    tableEl.innerHTML = '<div class="empty"><div class="big">🔎</div>No departments match "' + escapeHtml(q) + '".</div>';
+    return;
+  }
+
+  tableEl.innerHTML = `<table><thead><tr>
+    <th>HoD</th><th>Join code</th><th>Teachers</th><th>Billing</th><th>Created</th><th>Last activity</th><th>Status</th><th></th>
+  </tr></thead><tbody>` + groups.map(g => `
+    <tr${g.archived?' class="archived-row"':''}>
+      <td class="hod-name">${escapeHtml(g.hodName||'—')}</td>
+      <td><span class="code-chip"><span class="code">${escapeHtml(g.code)}</span><button class="copy-btn" title="Copy code" onclick="copyCode('${escapeHtml(g.code)}')">📋</button></span></td>
+      <td>${g.teacherCount}</td>
+      <td>${fmtBilling(g)}</td>
+      <td class="time-primary">${fmtDate(g.createdAt)}</td>
+      <td class="time-primary">${fmtDate(g.lastActivity)}<div class="time-rel">${fmtRelative(g.lastActivity)}</div></td>
+      <td><span class="badge ${g.archived?'archived':'active'}">${g.archived?'Archived':'Active'}</span></td>
+      <td><button class="mini-btn${g.archived?'':' danger'}" onclick="toggleArchive('${escapeHtml(g.code)}', ${!g.archived})">${g.archived?'Restore':'Archive'}</button></td>
+    </tr>`).join('') + `</tbody></table>`;
+}
+
+function copyCode(code){
+  navigator.clipboard?.writeText(code).then(()=>toast('Copied ' + code)).catch(()=>toast('Could not copy', true));
+}
+
+async function loadStats(){
+  const refreshBtn = document.getElementById('refresh-btn');
+  refreshBtn.classList.add('spinning');
+  document.getElementById('last-refreshed').innerHTML = '<span class="dot"></span>Loading…';
   try{
     const data = await api('/stats');
     document.getElementById('stat-groups').textContent = data.totalGroups;
     document.getElementById('stat-teachers').textContent = data.totalTeachers;
-    document.getElementById('stat-cap').textContent = Math.round((data.totalTeachers/200)*100) + '%';
+    const pct = Math.round((data.totalTeachers/200)*100);
+    document.getElementById('stat-cap').textContent = pct + '%';
+    document.getElementById('stat-cap-bar').style.width = Math.min(pct,100) + '%';
     document.getElementById('stat-archived').textContent = data.archivedGroups || 0;
-    if(!data.groups.length){
-      tableEl.innerHTML = '<div class="empty">No departments yet.</div>';
-    } else {
-      tableEl.innerHTML = `<table><thead><tr>
-        <th>HoD</th><th>Join code</th><th>Teachers</th><th>Billing</th><th>Created</th><th>Last activity</th><th>Status</th><th></th>
-      </tr></thead><tbody>` + data.groups.map(g => `
-        <tr${g.archived?' class="archived-row"':''}>
-          <td>${escapeHtml(g.hodName||'—')}</td>
-          <td><span class="code">${escapeHtml(g.code)}</span></td>
-          <td>${g.teacherCount}</td>
-          <td>${fmtBilling(g)}</td>
-          <td>${fmtDate(g.createdAt)}</td>
-          <td>${fmtDate(g.lastActivity)}</td>
-          <td><span class="badge ${g.archived?'archived':'active'}">${g.archived?'Archived':'Active'}</span></td>
-          <td><button class="mini-btn" onclick="toggleArchive('${escapeHtml(g.code)}', ${!g.archived})">${g.archived?'Restore':'Archive'}</button></td>
-        </tr>`).join('') + `</tbody></table>`;
-    }
-    document.getElementById('last-refreshed').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    LAST_GROUPS = data.groups || [];
+    renderGroupsTable();
+    document.getElementById('last-refreshed').innerHTML = '<span class="dot"></span>Updated ' + new Date().toLocaleTimeString();
   }catch(e){
     document.getElementById('last-refreshed').textContent = '';
-    tableEl.innerHTML = '<div class="empty">Could not load stats: ' + escapeHtml(e.message) + '</div>';
+    document.getElementById('groups-table').innerHTML = '<div class="empty">Could not load stats: ' + escapeHtml(e.message) + '</div>';
+    toast('Could not refresh: ' + e.message, true);
+  }finally{
+    refreshBtn.classList.remove('spinning');
   }
 }
 
 async function toggleArchive(code, archive){
+  if(!archive && !confirm('Archive department ' + code + '? Its data stays intact — you can restore it anytime.')) return;
   try{
     await api('/groups/' + encodeURIComponent(code) + '/archive', { method:'PUT', body: JSON.stringify({ archived: archive }) });
+    toast(archive ? code + ' archived' : code + ' restored');
     loadStats();
   }catch(e){
-    alert('Could not update: ' + e.message);
+    toast('Could not update: ' + e.message, true);
   }
 }
 
@@ -221,7 +439,14 @@ async function loadSettings(){
   try{
     const s = await api('/settings');
     document.getElementById('paywall-toggle').checked = !!s.paywallEnabled;
+    updatePaywallBadge(!!s.paywallEnabled);
   }catch(e){}
+}
+
+function updatePaywallBadge(on){
+  const b = document.getElementById('paywall-state-badge');
+  b.textContent = on ? 'On' : 'Off';
+  b.className = 'paywall-state ' + (on ? 'on' : 'off');
 }
 
 async function togglePaywall(){
@@ -231,9 +456,12 @@ async function togglePaywall(){
   try{
     await api('/settings', { method:'PUT', body: JSON.stringify({ paywallEnabled: checked }) });
     msg.textContent = checked ? 'Paywall is ON — HoDs will see the upgrade banner.' : 'Paywall is OFF — everyone has free access.';
+    updatePaywallBadge(checked);
+    toast(checked ? 'Paywall turned on' : 'Paywall turned off');
   }catch(e){
     msg.textContent = 'Failed to save: ' + e.message;
     document.getElementById('paywall-toggle').checked = !checked;
+    toast('Failed to save: ' + e.message, true);
   }
 }
 
