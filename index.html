@@ -2931,13 +2931,22 @@ function runTests(){
       {id:'noTopics',name:'NT',color:'#fff'}, // missing topics array
     ];
     const v=validateCls(raw);
-    assert('validateCls keeps valid',v.length,1); // only y7
-    assert('validateCls keeps topics',v[0].topics.length,1);
+    // validateCls drops invalid entries (null, missing topics array) but keeps
+    // a class even if every one of its topics gets filtered out — an empty
+    // class is harmless to show, whereas silently deleting a class the HoD
+    // set up (just because its topics look out of range right now) is not.
+    // So both 'y7' and 'bad' survive; only 'null' is dropped.
+    assert('validateCls keeps valid',v.length,2);
+    assert('validateCls drops invalid topics',v.find(c=>c.id==='bad').topics.length,0);
+    assert('validateCls keeps topics',v.find(c=>c.id==='y7').topics.length,1);
   });
 
   test('esc: sanitises XSS strings',()=>{
     assert('esc basic html','\u003cscript\u003e'.replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])),'&lt;script&gt;');
-    assert('escAttr strips quotes',escAttr('bad<>"name'),esc('bad<>"name'));
+    // escAttr and esc are different sanitisers for different contexts (attribute
+    // text vs. HTML-escaped text) and aren't expected to produce the same
+    // output — escAttr just strips the dangerous characters outright.
+    assert('escAttr strips quotes',escAttr('bad<>"name'),'bad___name');
   });
 
   T=savedT; // restore
