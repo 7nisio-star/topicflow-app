@@ -1842,6 +1842,14 @@ function renderCurricEditor(){
   co.style.overflowY='auto';
   const cls=CE.cls||allCls()[0];
   if(!cls){co.innerHTML='<div style="padding:24px;color:var(--text2);">No class selected.</div>';return;}
+  // Keep CE.cls in sync with what's actually displayed. Every entry point into the
+  // editor (topbar "Edit curriculum", empty-state "Set up the curriculum" buttons)
+  // sets YID='__curric' directly rather than going through openCurricEditor(), so
+  // without this, CE.cls stayed null until the class dropdown inside the editor was
+  // touched at least once — and every edit action (rename, resize, move, delete,
+  // drag-drop) guards on `if(!CE.cls)return;`, so it silently did nothing on a HoD's
+  // very first visit to the curriculum editor.
+  CE.cls=cls;
 
   // Show one-time read-only toast for non-HoD users
   const hod=isHoD();
