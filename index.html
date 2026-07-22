@@ -2076,6 +2076,7 @@ function ceAddStep(tid,val){
   renderCurricEditor();
 }
 function ceRenameStep(tid,sid,val){
+  if(!isHoD()){showToast('Curriculum is read-only. Only your HoD can make changes.');return;}
   if(!CE.cls)return;
   const t=CE.cls.topics.find(x=>x.id===tid);
   const s=t&&t.steps&&t.steps.find(x=>x.id===sid);
@@ -2090,6 +2091,7 @@ function ceDeleteStep(tid,sid){
   renderCurricEditor();
 }
 function ceMoveStep(tid,sid,dir){
+  if(!isHoD()){showToast('Curriculum is read-only. Only your HoD can make changes.');return;}
   if(!CE.cls)return;
   const t=CE.cls.topics.find(x=>x.id===tid);
   if(!t||!t.steps)return;
