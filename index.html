@@ -1206,7 +1206,16 @@ function validateT(raw){
         const status=Config.status.all.includes(p?.status)?p.status:Config.status.NONE;
         const as_=Number.isInteger(p?.actualStart)&&p.actualStart>=1&&p.actualStart<=Config.maxWeeks?p.actualStart:null;
         const ae_=Number.isInteger(p?.actualEnd)&&p.actualEnd>=1&&p.actualEnd<=Config.maxWeeks?p.actualEnd:null;
-        progress[tid]={status,actualStart:as_,actualEnd:ae_,early:!!p?.early};
+        const stepsDone={};
+        if(p?.stepsDone&&typeof p.stepsDone==='object'){
+          Object.entries(p.stepsDone).forEach(([sid,done])=>{ if(typeof sid==='string'&&done) stepsDone[sid]=true; });
+        }
+        // score/completionNote were previously dropped here on every load (pre-existing
+        // bug, unrelated to small steps) — a teacher's test score or completion note
+        // would silently vanish the next time the app booted. Preserved now.
+        const score_=Number.isFinite(p?.score)&&p.score>=0&&p.score<=100?p.score:null;
+        const completionNote_=typeof p?.completionNote==='string'?p.completionNote.substring(0,2000):'';
+        progress[tid]={status,actualStart:as_,actualEnd:ae_,early:!!p?.early,stepsDone,score:score_,completionNote:completionNote_};
       });
     }
     const gaps=Array.isArray(teacher.gaps)?teacher.gaps.filter(g=>g&&typeof g.topicId==='string'&&Config.gaps.includes(g.type)):[];
@@ -1815,7 +1824,7 @@ async function loadFromLocalFolder(){
 }
 
 /* ════ HoD CURRICULUM EDITOR ════ */
-let CE={cls:null, dragging:null, holidays:[]};
+let CE={cls:null, dragging:null, holidays:[], expandedSteps:{}};
 // Backup of a class's topic order/weeks before suggestThreadOrder() applies a
 // new order, so undoThreadOrder() can restore it. {clsId, topics:[...]} or null.
 let _lastThreadOrderBackup=null;
@@ -1940,7 +1949,27 @@ function renderCurricEditor(){
     <div class="divider"></div>
     <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Topic list — ${cls.topics.length} topics, ${cls.topics.reduce((s,t)=>s+t.end-t.start+1,0)} weeks</div>
     <div id="ce-topic-list">
-      ${topics.map((t,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;">
+      ${topics.map((t,i)=>{
+        const steps=t.steps||[];
+        const expanded=!!CE.expandedSteps[t.id];
+        const stepsPanel=expanded?`<div style="padding:8px 10px 10px 38px;background:var(--panel2);border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;margin-top:-5px;margin-bottom:5px;">
+          ${!steps.length?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px;">No small steps yet${hod?' — break this topic down, e.g. "1. Adding fractions", "2. Subtracting fractions"…':''}.</div>`:''}
+          ${steps.map((s,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;">
+            <span style="font-size:10px;color:var(--text3);width:16px;text-align:right;flex-shrink:0;">${si+1}</span>
+            ${hod
+              ?`<input value="${escAttr(s.name)}" class="sfield" style="flex:1;font-size:11px;padding:5px 8px;" onchange="ceRenameStep('${t.id}','${s.id}',this.value)">`
+              :`<span style="flex:1;font-size:11px;color:var(--text1);">${esc(s.name)}</span>`}
+            ${hod?`<button onclick="ceMoveStep('${t.id}','${s.id}',-1)" class="btn" style="font-size:10px;padding:2px 6px;" ${si===0?'disabled':''}>↑</button>`:''}
+            ${hod?`<button onclick="ceMoveStep('${t.id}','${s.id}',1)" class="btn" style="font-size:10px;padding:2px 6px;" ${si===steps.length-1?'disabled':''}>↓</button>`:''}
+            ${hod?`<button onclick="ceDeleteStep('${t.id}','${s.id}')" class="btn" style="font-size:10px;padding:2px 6px;color:var(--red);">✕</button>`:''}
+          </div>`).join('')}
+          ${hod?`<div style="display:flex;gap:6px;margin-top:6px;">
+            <input id="ce-newstep-${t.id}" class="sfield" placeholder="e.g. Adding fractions with different denominators" style="flex:1;font-size:11px;padding:5px 8px;" onkeydown="if(event.key==='Enter'){ceAddStep('${t.id}',this.value);this.value='';}">
+            <button onclick="const _el=document.getElementById('ce-newstep-${t.id}');ceAddStep('${t.id}',_el.value);_el.value='';" class="btn" style="font-size:11px;">+ Add step</button>
+          </div>`:''}
+        </div>`:'';
+        return `<div>
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel);border:1px solid var(--border);border-radius:${expanded?'8px 8px 0 0':'8px'};${expanded?'':'margin-bottom:5px;'}">
         <span style="font-size:10px;color:var(--text3);width:20px;text-align:right;">${i+1}</span>
         ${hod
           ?`<input value="${t.name}" class="sfield" style="flex:1;font-size:12px;" onchange="ceRename('${t.id}',this.value)">`
@@ -1954,6 +1983,7 @@ function renderCurricEditor(){
             </select>`;
           return st?`<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${st.color}22;color:${st.color};border:1px solid ${st.color}55;flex-shrink:0;">${esc(st.name)}</span>`:'';
         })()}
+        <button onclick="ceToggleSteps('${t.id}')" class="btn" style="font-size:10px;padding:2px 7px;flex-shrink:0;${steps.length?'color:var(--acc);border-color:rgba(108,86,245,.35);':''}" title="Small steps">📝 ${steps.length||'Steps'}</button>
         <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
           <span style="font-size:11px;color:var(--text3);">W${t.start}–${t.end}</span>
           ${hod?`<button onclick="ceSetDur('${t.id}',-1)" class="btn" style="font-size:11px;padding:2px 7px;">−</button>`:''}
@@ -1963,7 +1993,10 @@ function renderCurricEditor(){
           ${hod?`<button onclick="ceMoveDown(${i})" class="btn" style="font-size:11px;padding:2px 7px;" ${i===topics.length-1?'disabled':''}>↓</button>`:''}
           ${hod?`<button onclick="ceDeleteTopic('${t.id}')" class="btn" style="font-size:11px;padding:2px 7px;color:var(--red);">✕</button>`:''}
         </div>
-      </div>`).join('')}
+        </div>
+        ${stepsPanel}
+        </div>`;
+      }).join('')}
     </div>
   </div>`;
 }
@@ -2016,6 +2049,47 @@ function ceDeleteTopic(tid){
   if(!CE.cls)return;
   CE.cls.topics=CE.cls.topics.filter(x=>x.id!==tid);
   ceRelayout(); renderCurricEditor();
+}
+/* ── Small steps (per-topic checklist, e.g. Fractions: 1. Adding 2. Subtracting…) ── */
+function ceToggleSteps(tid){
+  CE.expandedSteps[tid]=!CE.expandedSteps[tid];
+  renderCurricEditor();
+}
+function ceAddStep(tid,val){
+  if(!isHoD()){showToast('Curriculum is read-only. Only your HoD can make changes.');return;}
+  val=(val||'').trim();
+  if(!val)return;
+  if(!CE.cls)return;
+  const t=CE.cls.topics.find(x=>x.id===tid);
+  if(!t)return;
+  if(!t.steps)t.steps=[];
+  t.steps.push({id:tid+'_s'+Date.now(),name:val});
+  CE.expandedSteps[tid]=true;
+  renderCurricEditor();
+}
+function ceRenameStep(tid,sid,val){
+  if(!CE.cls)return;
+  const t=CE.cls.topics.find(x=>x.id===tid);
+  const s=t&&t.steps&&t.steps.find(x=>x.id===sid);
+  if(s) s.name=val.trim();
+}
+function ceDeleteStep(tid,sid){
+  if(!isHoD()){showToast('Curriculum is read-only. Only your HoD can make changes.');return;}
+  if(!CE.cls)return;
+  const t=CE.cls.topics.find(x=>x.id===tid);
+  if(!t||!t.steps)return;
+  t.steps=t.steps.filter(x=>x.id!==sid);
+  renderCurricEditor();
+}
+function ceMoveStep(tid,sid,dir){
+  if(!CE.cls)return;
+  const t=CE.cls.topics.find(x=>x.id===tid);
+  if(!t||!t.steps)return;
+  const i=t.steps.findIndex(x=>x.id===sid);
+  const j=i+dir;
+  if(i<0||j<0||j>=t.steps.length)return;
+  [t.steps[i],t.steps[j]]=[t.steps[j],t.steps[i]];
+  renderCurricEditor();
 }
 function ceAddTopic(startWeek){
   if(!isHoD()){showToast('Curriculum is read-only. Only your HoD can make changes.');return;}
@@ -3094,6 +3168,13 @@ function renderToday(){
         <span class="tv-suggestion-icon">💡</span>
         <span>${behind===1?'You\'re 1 week behind — consider compressing this topic or combining with a review session.':behind===2?'2 weeks behind — compress into 1 lesson and assign the rest as independent work.':'More than 2 weeks behind — skip lower-priority parts and assign independent work. Talk to your HoD.'}</span>
       </div>`:''}
+      ${dt.steps&&dt.steps.length?`<div style="padding:2px 16px 6px;">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">Small steps (${dt.steps.filter(s=>p.stepsDone&&p.stepsDone[s.id]).length}/${dt.steps.length})</div>
+        ${dt.steps.map(s=>`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);padding:4px 0;">
+          <input type="checkbox" ${p.stepsDone&&p.stepsDone[s.id]?'checked':''} onchange="togStep('${escAttr(U)}','${dt.id}','${s.id}','${cls.id}');renderToday();" style="accent-color:var(--acc);width:14px;height:14px;flex-shrink:0;">
+          <span style="${p.stepsDone&&p.stepsDone[s.id]?'text-decoration:line-through;color:var(--text3);':''}">${esc(s.name)}</span>
+        </label>`).join('')}
+      </div>`:''}
       <div class="tv-actions">
         ${[
           {sv:'none',   lbl:'○&nbsp; Not yet',  ac:'is-active-none'},
@@ -3319,7 +3400,8 @@ function viewTs(clsId){
 
 function gp(name,tid){
   if(!T[name])T[name]={name,progress:{},gaps:[]};
-  if(!T[name].progress[tid])T[name].progress[tid]={status:'none',early:false,actualStart:null,actualEnd:null};
+  if(!T[name].progress[tid])T[name].progress[tid]={status:'none',early:false,actualStart:null,actualEnd:null,stepsDone:{}};
+  if(!T[name].progress[tid].stepsDone)T[name].progress[tid].stepsDone={}; // backfill for progress saved before small steps existed
   return T[name].progress[tid];
 }
 function hg(n,tid,type){return (T[n]?.gaps||[]).some(g=>g.topicId===tid&&g.type===type);}
@@ -3527,6 +3609,34 @@ function setSts(name,tid,s2){
   savT();renderGanttSection();if(DP)openDp(DP.name,DP.tid,DP.cls);
   if(s2==='taught'&&_prevSts!=='taught') showToast('\u2713 Marked taught \u2014 Ctrl+Z to undo',4500);
 }
+/* \u2550\u2550\u2550\u2550 SMALL STEPS \u2550\u2550\u2550\u2550
+   Optional per-topic checklist (e.g. Fractions: 1. Adding 2. Subtracting\u2026).
+   Ticking steps auto-derives the topic's overall status:
+   all done \u2192 taught \u00b7 some done \u2192 progress \u00b7 none done \u2192 not started.
+   Topics with no steps defined are completely unaffected. \u2550\u2550\u2550\u2550 */
+function togStep(name,tid,stepId,clsId){
+  if(!T[name])return;
+  if(!canEdit(name)){showToast('You can only update your own progress.');return;}
+  const cls=getCls(clsId); if(!cls) return;
+  const topic=cls.topics.find(t=>t.id===tid); if(!topic||!topic.steps||!topic.steps.length) return;
+  const p=gp(name,tid), cw=getCW();
+  _pushUndo();
+  p.stepsDone[stepId]=!p.stepsDone[stepId];
+  const doneCount=topic.steps.filter(s=>p.stepsDone[s.id]).length, total=topic.steps.length;
+  const _prevSts=p.status;
+  if(doneCount===total){
+    p.status='taught';
+    if(!p.actualStart)p.actualStart=cw;
+    if(!p.actualEnd)p.actualEnd=cw;
+  } else if(doneCount>0){
+    p.status='progress';
+    if(!p.actualStart)p.actualStart=cw;
+  } else {
+    p.status='none';p.actualStart=null;p.actualEnd=null;
+  }
+  savT();renderGanttSection();if(DP)openDp(DP.name,DP.tid,DP.cls);
+  if(doneCount===total&&_prevSts!=='taught') showToast('\u2713 All steps done \u2014 marked taught',4500);
+}
 function togEarly(name,tid){if(!T[name])return;const p=gp(name,tid);p.early=!p.early;savT();renderGanttSection();if(DP)openDp(name,tid,DP.cls);}
 function togGap(name,tid,type){
   if(!T[name])return;const gaps=T[name].gaps||(T[name].gaps=[]);
@@ -3592,6 +3702,13 @@ function openDp(name,tid,cls){
           style="padding:12px 6px;border-radius:10px;border:2px solid ${brd};background:${bg};color:${col};font-size:12px;font-weight:${on?700:500};cursor:pointer;text-align:center;transition:all .15s;">${lb}</button>`;
       }).join('')}
     </div>
+    ${topic.steps&&topic.steps.length?`<div class="dp-lbl">Small steps (${topic.steps.filter(s=>p.stepsDone[s.id]).length}/${topic.steps.length})</div>
+    <div style="margin-bottom:12px;">
+      ${topic.steps.map(s=>`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text2);padding:4px 0;">
+        <input type="checkbox" ${p.stepsDone[s.id]?'checked':''} onchange="togStep('${name}','${tid}','${s.id}','${cls.id}')" style="accent-color:var(--acc);width:14px;height:14px;flex-shrink:0;">
+        <span style="${p.stepsDone[s.id]?'text-decoration:line-through;color:var(--text3);':''}">${esc(s.name)}</span>
+      </label>`).join('')}
+    </div>`:''}
     ${p.status==='taught'?`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:var(--text2);margin-bottom:12px;"><input type="checkbox" ${p.early?'checked':''} onchange="togEarly('${name}','${tid}')" style="accent-color:var(--acc);width:13px;height:13px;"> \u2605 Finished ahead of schedule</label>`:''}
     ${p.status==="taught"?`<div class="dp-lbl">Class test score (avg %)</div><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;"><input type="number" min="0" max="100" value="${p.score!=null?p.score:''}" placeholder="e.g. 74" class="sfield" style="width:70px;" onchange="saveScore('${name}','${tid}',this.value)"><div style="flex:1;height:6px;background:var(--panel3);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${p.score||0}%;background:${scoreColour(p.score!=null?p.score:null)||'transparent'};border-radius:3px;"></div></div><span style="font-size:12px;color:${scoreColour(p.score!=null?p.score:null)||'var(--text3)'};font-weight:700;">${p.score!=null?p.score+'%':'\u2014'}</span></div>`:''}
     ${p.status==='taught'?`<div class="dp-lbl">Completion note <span style="font-size:10px;font-weight:400;color:var(--text3);">what went well / improve next time</span></div>
