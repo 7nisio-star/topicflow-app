@@ -428,6 +428,7 @@ export default async (req) => {
         const arr = Object.values(group.teachers).map(t => ({
           teacher: { id: t.id, name: t.name, avatarColor: t.avatarColor },
           progress: t.progress || {},
+          preferences: t.preferences || {},
           updatedAt: t.updatedAt
         }));
         return json(200, arr);
