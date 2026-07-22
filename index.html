@@ -1350,6 +1350,7 @@ const lfApi={
       clearDemoTeachers();
       if(getRole()==='teacher'){
         startProgressAutosave();
+        startPeerPolling();
         syncSoWFromServer().then(()=>render()).catch(()=>render());
       } else {
         startHoDPolling();
@@ -1428,7 +1429,9 @@ function savePrefs(patch){
   if(gcode&&tid&&tid!=='hod'){
     const serverPrefs={
       colorScheme: p.theme||'default',
-      layoutPrefs: {layout:p.layout||'spacious', avatarColor:p.avatarColor||'#7c63f8'}
+      layoutPrefs: {layout:p.layout||'spacious', avatarColor:p.avatarColor||'#7c63f8'},
+      // Shared so peers can honour this teacher's choice about broadcasting steps.
+      peerShareSteps: !!p.peerShareSteps
     };
     lfApi.put('/groups/'+gcode+'/teachers/'+tid+'/preferences',serverPrefs).catch(()=>{});
   }
@@ -1510,6 +1513,114 @@ function startHoDPolling(){
     if(getRole()==='hod') pollHoDProgress().then(()=>render()).catch(()=>{});
   },30000);
 }
+/* ════ PEER ACTIVITY FEED ════════════════════════════════════════
+   Lightweight, opt-out "team activity" so teachers feel connected and
+   don't fall behind in silence. When a colleague marks a topic taught
+   (or, if they've opted in, ticks off a small step), teachers who ALSO
+   teach that year group get a brief flash + a notification-bell entry.
+
+   Fully client-side: reuses GET /groups/CODE/progress (already readable
+   by any group member — see lf.mjs). Each poll diffs against a saved
+   snapshot to detect *new* completions. Scope = "same year group only":
+   you only hear about topics in classes you also teach. On the very
+   first poll the snapshot is empty, so we seed silently (no flood of
+   pre-existing completions on login).
+   ════════════════════════════════════════════════════════════════ */
+const PEER_SNAP_KEY='lf_peer_snap', PEER_FEED_KEY='lf_peer_feed';
+let _peerPollTimer=null, _pushProgT=null;
+function peerViewOn(){return getPrefs().peerActivityView!==false;} // default ON
+function getPeerFeed(){try{return JSON.parse(localStorage.getItem(PEER_FEED_KEY)||'[]');}catch(e){return [];}}
+function savePeerFeed(f){try{localStorage.setItem(PEER_FEED_KEY,JSON.stringify(f.slice(0,50)));}catch(e){}}
+function getPeerSnap(){try{return JSON.parse(localStorage.getItem(PEER_SNAP_KEY)||'null');}catch(e){return null;}}
+function savePeerSnap(s){try{localStorage.setItem(PEER_SNAP_KEY,JSON.stringify(s));}catch(e){}}
+// Classes the current teacher teaches, for "same year group" scoping.
+// Assignment first, else infer from own progress, else fail open (see all).
+function myClsIds(){
+  const a=getAssign()[U];
+  if(a&&a.length) return a;
+  const mine=new Set(), prog=(T[U]&&T[U].progress)||{};
+  allCls().forEach(c=>c.topics.forEach(t=>{const p=prog[t.id];
+    if(p&&((p.status&&p.status!=='none')||(p.stepsDone&&Object.keys(p.stepsDone).length))) mine.add(c.id);}));
+  return mine.size?[...mine]:allCls().map(c=>c.id);
+}
+function _topicCls(tid){for(const c of allCls()){const t=c.topics.find(x=>x.id===tid);if(t)return{topic:t,cls:c};}return null;}
+// Push my progress to the server ~1.2s after I stop clicking, so peers see
+// my completions on their next poll (rather than waiting for the 30s autosave).
+function pushProgressSoon(){
+  if(getRole()!=='teacher') return;
+  clearTimeout(_pushProgT);
+  _pushProgT=setTimeout(()=>syncProgressToServer().catch(()=>{}),1200);
+}
+async function pollPeerActivity(){
+  const gcode=localStorage.getItem(LF_GCODE_KEY);
+  if(!gcode||getRole()!=='teacher'||!U||!peerViewOn()) return;
+  let arr;
+  try{ arr=await lfApi.get('/groups/'+gcode+'/progress'); }catch(e){ return; }
+  if(!Array.isArray(arr)) return;
+  const scope=new Set(myClsIds()), snap=getPeerSnap(), fresh={}, events=[];
+  arr.forEach(entry=>{
+    const name=entry.teacher&&entry.teacher.name;
+    if(!name||name===U) return;
+    const color=entry.teacher&&entry.teacher.avatarColor;
+    const shares=!!(entry.preferences&&entry.preferences.peerShareSteps);
+    const prog=(entry.progress&&(entry.progress.progress||entry.progress))||{};
+    fresh[name]={};
+    Object.keys(prog).forEach(tid=>{
+      const p=prog[tid]||{};
+      const stepIds=p.stepsDone?Object.keys(p.stepsDone).filter(k=>p.stepsDone[k]):[];
+      fresh[name][tid]={status:p.status||'none',steps:stepIds};
+      const info=_topicCls(tid);
+      if(!info||!scope.has(info.cls.id)) return;   // not a year group I teach
+      if(!snap) return;                            // first run → seed only
+      const prev=(snap[name]&&snap[name][tid])||{status:'none',steps:[]};
+      if(p.status==='taught'&&prev.status!=='taught'){
+        events.push({teacher:name,color,text:name+' finished '+info.topic.name});
+        return;                                    // topic event supersedes step events
+      }
+      if(shares&&info.topic.steps&&info.topic.steps.length){
+        stepIds.forEach(sid=>{
+          if(prev.steps.indexOf(sid)>-1) return;
+          const st=info.topic.steps.find(s=>s.id===sid);
+          if(st) events.push({teacher:name,color,text:name+' completed “'+st.name+'” ('+info.topic.name+')'});
+        });
+      }
+    });
+  });
+  savePeerSnap(fresh);
+  if(!snap||!events.length) return;                // seeded, or nothing new
+  const feed=getPeerFeed();
+  events.forEach(ev=>feed.unshift({id:'p'+Date.now()+Math.random().toString(36).slice(2,6),teacher:ev.teacher,color:ev.color,text:ev.text,ts:Date.now(),seen:false}));
+  savePeerFeed(feed);
+  peerFlash(events.length===1?events[0].text:events.length+' updates from your team',events[0].color);
+  updateAlertBell();
+}
+function startPeerPolling(){
+  if(_peerPollTimer) return;
+  pollPeerActivity().catch(()=>{});
+  _peerPollTimer=setInterval(()=>{pollPeerActivity().catch(()=>{});},30000);
+}
+function peerFlash(text,color){
+  let host=document.getElementById('peer-flash-host');
+  if(!host){host=document.createElement('div');host.id='peer-flash-host';
+    host.style.cssText='position:fixed;top:56px;right:16px;z-index:1000;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+    document.body.appendChild(host);}
+  const card=document.createElement('div');
+  card.style.cssText='pointer-events:auto;background:var(--panel2);border:1px solid var(--border2);border-left:3px solid '+(color||'var(--acc)')+';border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--text);box-shadow:0 6px 24px rgba(0,0,0,.45);max-width:300px;opacity:0;transform:translateX(12px);transition:opacity .25s,transform .25s;';
+  card.innerHTML='<span style="margin-right:6px;">👋</span>'+esc(text);
+  host.appendChild(card);
+  requestAnimationFrame(()=>{card.style.opacity='1';card.style.transform='translateX(0)';});
+  setTimeout(()=>{card.style.opacity='0';card.style.transform='translateX(12px)';setTimeout(()=>card.remove(),300);},5000);
+}
+function _peerAgo(ts){const d=Date.now()-ts,m=Math.round(d/60000);if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.round(m/60);if(h<24)return h+'h ago';return Math.round(h/24)+'d ago';}
+function _peerFeedSectionHTML(){
+  const feed=getPeerFeed();
+  if(!feed.length) return `<div class="ap-section-hd" style="color:var(--acc);">👋 Team activity</div><div style="font-size:11px;color:var(--text3);padding:4px 8px 8px;">No updates yet — you'll see it here when a colleague finishes a topic in a year group you teach.</div>`;
+  return `<div class="ap-section-hd" style="color:var(--acc);">👋 Team activity</div>`+feed.slice(0,12).map(f=>`<div class="ap-alert-row blue" style="cursor:default;">
+    <span style="width:8px;height:8px;border-radius:50%;background:${f.color||'var(--acc)'};flex-shrink:0;"></span>
+    <span class="ap-alert-txt">${esc(f.text)}<span style="display:block;font-size:10px;color:var(--text3);">${_peerAgo(f.ts)}</span></span>
+  </div>`).join('');
+}
+function _markPeerFeedSeen(){const f=getPeerFeed();let ch=false;f.forEach(x=>{if(!x.seen){x.seen=true;ch=true;}});if(ch){savePeerFeed(f);updateAlertBell();}}
 function isHoD(){return getRole()==='hod'||(!!U&&(U.toLowerCase().includes('hod')||U.toLowerCase().includes('head')||U.toLowerCase().includes('admin')));}
 function canEdit(name){return isHoD()||name===U;}
 function canViewAll(){return isHoD();}
@@ -3617,6 +3728,7 @@ function setSts(name,tid,s2){
   if(s2==='taught'&&!p.actualEnd)p.actualEnd=cw;
   if(s2==='none'){p.actualStart=null;p.actualEnd=null;}
   savT();renderGanttSection();if(DP)openDp(DP.name,DP.tid,DP.cls);
+  pushProgressSoon(); // let peers see this completion on their next poll
   if(s2==='taught'&&_prevSts!=='taught') showToast('\u2713 Marked taught \u2014 Ctrl+Z to undo',4500);
 }
 /* \u2550\u2550\u2550\u2550 SMALL STEPS \u2550\u2550\u2550\u2550
@@ -3645,6 +3757,7 @@ function togStep(name,tid,stepId,clsId){
     p.status='none';p.actualStart=null;p.actualEnd=null;
   }
   savT();renderGanttSection();if(DP)openDp(DP.name,DP.tid,DP.cls);
+  pushProgressSoon(); // let peers see this step/topic completion on their next poll
   if(doneCount===total&&_prevSts!=='taught') showToast('\u2713 All steps done \u2014 marked taught',4500);
 }
 function togEarly(name,tid){if(!T[name])return;const p=gp(name,tid);p.early=!p.early;savT();renderGanttSection();if(DP)openDp(name,tid,DP.cls);}
@@ -3956,8 +4069,12 @@ function renderAlertsPanel(){
   const all=computeAlerts();
   const alerts=all.filter(a=>!dismissed.includes(a.text));
 
+  // Team activity — teachers only, shown even when there are no alerts.
+  const teamHTML=(getRole()==='teacher'&&peerViewOn())?_peerFeedSectionHTML():'';
+
   if(!alerts.length){
-    panel.innerHTML='<div style="font-size:12px;color:var(--teal);text-align:center;padding:8px;">✓ No issues right now 🎉</div>';
+    panel.innerHTML=teamHTML+'<div style="font-size:12px;color:var(--teal);text-align:center;padding:8px;">✓ No issues right now 🎉</div>';
+    _markPeerFeedSeen();
     return;
   }
 
@@ -3979,16 +4096,19 @@ function renderAlertsPanel(){
   const info=alerts.filter(a=>a.severity==='info'||!a.severity&&a.type==='blue');
 
   panel.innerHTML=
+    teamHTML+
     sec('Critical',critical,'red')+
     sec('Warnings',warnings,'amber')+
     sec('Info',info,'blue')+
     (all.length>0?`<button class="ap-clear-all" onclick="_clearAllAlerts()">Clear all dismissed</button>`:'');
+  _markPeerFeedSeen();
 }
 function updateAlertBell(){
   const alerts=computeAlerts();
   const cnt=document.getElementById('alert-count');
   if(!cnt) return;
-  const n=alerts.filter(a=>a.type==='red').length;
+  let n=alerts.filter(a=>a.type==='red').length;
+  if(getRole()==='teacher'&&peerViewOn()) n+=getPeerFeed().filter(f=>!f.seen).length;
   cnt.textContent=n;
   cnt.style.display=n>0?'block':'none';
 }
@@ -7234,6 +7354,7 @@ async function lfTeacherJoin(){
     try{localStorage.setItem(CFG_KEY,JSON.stringify({setupComplete:true,authType:'server',role:'teacher'}));}catch(e){}
     await syncSoWFromServer().catch(()=>{});
     startProgressAutosave();
+    startPeerPolling();
     SETUP=false;
     _releaseSetupTrap();
     DASH=false;
@@ -7643,6 +7764,16 @@ function renderProfile(){
       <button onclick="applyLayout('spacious');savePrefs({layout:'spacious'});renderProfile();" class="lf-lt-btn${layout!=='compact'?' on':''}">⬜ Spacious</button>
       <button onclick="applyLayout('compact');savePrefs({layout:'compact'});renderProfile();" class="lf-lt-btn${layout==='compact'?' on':''}">▣ Compact</button>
     </div>
+
+    <div class="lf-pp-lbl">Team activity</div>
+    <label style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--panel3);border-radius:10px;font-size:12.5px;cursor:pointer;margin-bottom:8px;">
+      <span>See what your team is up to<br><span style="font-size:11px;color:var(--text3);">A quick flash when a colleague finishes a topic in a year group you teach.</span></span>
+      <input type="checkbox" ${prefs.peerActivityView!==false?'checked':''} onchange="savePrefs({peerActivityView:this.checked});if(this.checked){localStorage.removeItem('lf_peer_snap');startPeerPolling();}updateAlertBell();renderProfile();" style="width:16px;height:16px;accent-color:var(--acc);flex-shrink:0;margin-top:2px;">
+    </label>
+    <label style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--panel3);border-radius:10px;font-size:12.5px;cursor:pointer;">
+      <span>Share my small steps with the team<br><span style="font-size:11px;color:var(--text3);">Off: colleagues only see when you finish a whole topic. On: they also see each small step you tick.</span></span>
+      <input type="checkbox" ${prefs.peerShareSteps?'checked':''} onchange="savePrefs({peerShareSteps:this.checked});renderProfile();" style="width:16px;height:16px;accent-color:var(--acc);flex-shrink:0;margin-top:2px;">
+    </label>
 
     ${gcode?`
     <div class="lf-pp-lbl">Group join code</div>
