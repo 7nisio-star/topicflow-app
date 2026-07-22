@@ -5267,7 +5267,7 @@ function renderDashboard(){
   co.style.overflowY='auto';
   co.innerHTML=`<div id="dash-wrap">
     <div class="dash-header">
-      ${!isHoD()&&U?`<div onclick="DASH=false;VIEW='checkin';YID=allCls()[0]?.id||'y7';render()"
+      ${!isHoD()&&U?`<div onclick="DASH=false;SIMPLE_MODE=true;localStorage.setItem('lf_simple','1');VIEW='checkin';YID=allCls()[0]?.id||'y7';render()"
         style="background:linear-gradient(135deg,var(--acc),#5a42d4);border-radius:12px;padding:13px 16px;margin-bottom:14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;user-select:none;">
         <div>
           <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:2px;">✓ Update your progress</div>
