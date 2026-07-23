@@ -8160,6 +8160,7 @@ function maybePromptTermReport(){
   try{
     if(typeof isHoD!=='function'||!isHoD()) return; // HoDs only
     if(typeof PD==='undefined'||!PD.weeks||typeof getCW!=='function') return;
+    if(typeof allCls==='function'&&!allCls().length) return; // no scheme yet — nothing to report
     const cw=getCW();
     if(cw<PD.weeks) return; // term/scheme not finished yet
     const key=_termReportPromptKey();
