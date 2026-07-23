@@ -366,6 +366,18 @@ export default async (req) => {
         return json(200, { code: g.code, archived: g.archived });
       }
 
+      // Admin start-fresh: same as the HoD reset, but admin-key protected so a
+      // group can be blanked without the HoD passphrase.
+      if (method === 'PUT' && parts[1] === 'groups' && parts[3] === 'reset' && parts.length === 4) {
+        const code = parts[2].toUpperCase();
+        const g = await getGroup(code);
+        if (!g) return json(404, { error: 'Group not found.' });
+        g.sow = { data: null, updatedAt: Date.now() };
+        Object.values(g.teachers).forEach(t => { t.progress = {}; t.updatedAt = Date.now(); });
+        await saveGroup(g);
+        return json(200, { ok: true, code: g.code });
+      }
+
       if (parts[1] === 'settings' && parts.length === 2) {
         if (method === 'GET') {
           return json(200, await getSettings());
@@ -432,6 +444,15 @@ export default async (req) => {
           updatedAt: t.updatedAt
         }));
         return json(200, arr);
+      }
+      // Start fresh: wipe the scheme of work and every teacher's progress so a
+      // new scheme can be uploaded. Teachers stay joined (records kept, same code).
+      if (method === 'POST' && parts[2] === 'reset' && parts.length === 3) {
+        if (tokRec.role !== 'hod') return json(403, { error: 'HoD only.' });
+        group.sow = { data: null, updatedAt: Date.now() };
+        Object.values(group.teachers).forEach(t => { t.progress = {}; t.updatedAt = Date.now(); });
+        await saveGroup(group);
+        return json(200, { ok: true });
       }
     }
 
