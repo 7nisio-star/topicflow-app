@@ -1137,6 +1137,7 @@ const INT_KEY='lf_int';     // intervention flags
 const ROSTER_KEY='lf_roster'; // teacher roster {name, role, classes[], email}
 const CAL_KEY='lf_cal';       // school calendar overrides {termStart, holidays[]}
 const STRAND_KEY='lf_strands'; // topic strands/groups per class
+const SOL_KEY='lf_sol';       // uploaded/edited scheme of learning (classes) — local persistence
 /* ─── Server multi-user keys ─── */
 const LF_TOKEN_KEY='lf_token';   // server HMAC token
 const LF_TID_KEY='lf_tid';       // teacher id (numeric) or 'hod'
@@ -1302,7 +1303,17 @@ const lfApi={
 };
 
 (function(){
-  // Snapshot original classes before SoL overrides them
+  // ── Subject-agnostic by default ──────────────────────────────────
+  // The app no longer ships with a scheme baked in. The built-in Maths
+  // curriculum is preserved as an unused sample (window._SAMPLE_CLASSES)
+  // but is NEVER auto-loaded — every department starts blank and uploads
+  // its own scheme of work (Maths, Science, or anything). An uploaded
+  // scheme repopulates PD.classes below (from localStorage SOL_KEY, the
+  // setup wizard, or the server SoW).
+  window._SAMPLE_CLASSES=PD.classes;
+  PD.classes=[];
+  PD.term='Scheme of Work';
+  // Snapshot (now empty) so "Clear scheme" / restore returns to blank.
   window._PD_CLASSES_ORIG=JSON.stringify(PD.classes);
   try{T=validateT(JSON.parse(localStorage.getItem(TK))||{});}catch(e){T={};}  
   try{U=localStorage.getItem(UK);}catch(e){}
@@ -1333,7 +1344,8 @@ const lfApi={
     }
     if(e.key==='Escape'){const _cfmOv=document.querySelector('.lf-confirm-overlay');if(_cfmOv){const _cfmCancel=_cfmOv.querySelector('#_lfc_cancel');if(_cfmCancel)_cfmCancel.click();else _cfmOv.remove();return;}if(document.getElementById('dp').classList.contains('open')){closeDp();return;}if(SETUP){SETUP=false;_releaseSetupTrap();render();}}
   });
-  if(!Object.keys(T).length) seedDemo();
+  // No demo seeding — the app starts blank and subject-agnostic. (seedDemo is
+  // still available for the "Reset to sample data" action but never runs on boot.)
   // Apply saved prefs (theme/layout)
   (function(){try{const p=JSON.parse(localStorage.getItem(LF_PREFS_KEY)||'{}');applyTheme(p.theme||'default');applyLayout(p.layout||'spacious');}catch(e){}})();
   // Boot: check for returning server user first
@@ -1374,6 +1386,9 @@ const lfApi={
 })();
 
 function seedDemo(){
+  // Sample-data path (never auto-runs on boot): load the built-in Maths sample
+  // so "Reset to sample data" shows a coherent, populated example.
+  if(!PD.classes.length&&window._SAMPLE_CLASSES){PD.classes=JSON.parse(JSON.stringify(window._SAMPLE_CLASSES));PD.term='Maths 2025/26 (sample)';}
   const cw=getCW();
   DEMO.forEach((name,ti)=>{
     T[name]={name,progress:{},gaps:[]};
@@ -2248,10 +2263,13 @@ function saveCurric(){
   if(idx>-1) PD.classes[idx]=cls;
   // Persist custom curriculum
   try{
-    const sol=PD.classes.filter(c2=>c2._custom||CE.cls.id===c2.id);
     cls._custom=true;
-    localStorage.setItem(SOL_KEY,JSON.stringify(sol));
+    // Persist the WHOLE scheme locally (all classes), not just custom ones, so a
+    // blank-default app reliably reloads the HoD's scheme.
+    localStorage.setItem(SOL_KEY,JSON.stringify(PD.classes));
   }catch(e){}
+  // Server HoD: push the scheme so it persists and teachers receive it.
+  if(localStorage.getItem(LF_GCODE_KEY)&&getRole()==='hod') syncSoWToServer().catch(()=>{});
   showToast('Curriculum saved and applied to all teacher pages.');
   goY(cls.id);
 }
@@ -3191,6 +3209,8 @@ function renderToday(){
     return;
   }
 
+  if(!classes.length){ renderNoScheme(); return; } // no scheme uploaded yet
+
   // ── Compute status across all classes ──
   const behindClasses=classes.filter(cls=>wksBehind(U,cls,cw)>0);
   const aheadClasses=classes.filter(cls=>wksAhead(U,cls,cw)>0);
@@ -3768,21 +3788,45 @@ function togGap(name,tid,type){
 }
 
 function clearScheme(){
-  showConfirm('Clear the uploaded scheme of work and return to the built-in Maths curriculum?\n\n✓ Teacher progress data is kept\n✗ Uploaded topics and custom classes will be removed',function(){
+  showConfirm('Remove the scheme of work?\n\n✓ Teacher progress data is kept\n✗ The scheme (all topics & classes) is removed so you can upload a new one',function(){
     try{localStorage.removeItem(SOL_KEY);}catch(e){}
     try{localStorage.removeItem(STRAND_KEY);}catch(e){}
-    try{if(window._PD_CLASSES_ORIG){PD.classes=JSON.parse(window._PD_CLASSES_ORIG);}}catch(e){}
+    PD.classes=[];
     CUSTOM=[];
     savC();
     SETUP_DATA.parsedClasses=null;
     SETUP_DATA.fileName='';
     SETUP_DATA.fileObj=null;
-    YID=PD.classes[0]?.id||'y7';
+    // Server HoD: clear the scheme on the server too.
+    if(localStorage.getItem(LF_GCODE_KEY)&&getRole()==='hod') syncSoWToServer().catch(()=>{});
+    YID=null;
     VIEW='gantt';
     DASH=true;
-    showToast('✓ Scheme cleared — using built-in curriculum');
+    showToast('✓ Scheme removed — upload a new one to begin');
     render();
   });
+}
+/* Start fresh — full blank slate ready for a new scheme (any subject).
+   Server HoD: also wipes the scheme + every teacher's progress on the server
+   (teachers stay joined, same code). Local: clears this device. */
+function startFresh(){
+  const gcode=localStorage.getItem(LF_GCODE_KEY);
+  const serverHoD=!!gcode&&getRole()==='hod';
+  const msg=serverHoD
+    ? 'Start fresh?\n\nThis removes the scheme of work AND every teacher\'s progress so you can upload a new scheme — for any subject. Your teachers stay joined with the same code.\n\nThis cannot be undone.'
+    : 'Start fresh?\n\nThis removes the scheme and all progress on this device.\n\nThis cannot be undone.';
+  showConfirm(msg,async function(){
+    [SOL_KEY,STRAND_KEY,CK,TK,CAL_KEY,'lf_peer_snap','lf_peer_feed','lf_assign'].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
+    T={};CUSTOM=[];PD.classes=[];
+    if(serverHoD){
+      try{await lfApi.post('/groups/'+gcode+'/reset',{});}
+      catch(e){showToast('Cleared on this device, but the server reset failed — please try again.');}
+    }
+    SETUP_DATA.parsedClasses=null;SETUP_DATA.fileName='';SETUP_DATA.fileObj=null;
+    YID=null;VIEW='gantt';DASH=true;
+    showToast('✓ Fresh start — upload your scheme to begin');
+    render();
+  },null,{okLabel:'Start fresh',danger:true});
 }
 function clrMe(){if(!U)return;showConfirm('Clear your progress?',function(){T[U]={name:U,progress:{},gaps:[]};savT();render();});}
 function clrT(n){showConfirm('Remove '+n+'?',function(){delete T[n];savT();render();});}
@@ -5418,7 +5462,28 @@ function svgCircle(pct, col, size=72){
   </svg>`;
 }
 
+/* Blank-start empty state: shown when no scheme of work exists yet. */
+function renderNoScheme(){
+  const co=document.getElementById('content');
+  if(!co) return;
+  co.style.overflowY='auto';
+  const hod=isHoD();
+  co.innerHTML=`<div style="max-width:520px;margin:8vh auto;padding:28px 24px;text-align:center;">
+    <div style="font-size:52px;margin-bottom:14px;">📚</div>
+    <div style="font-size:20px;font-weight:800;margin-bottom:8px;">${hod?'Set up your scheme of work':'No scheme yet'}</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:22px;">
+      ${hod
+        ? 'TopicFlow is ready for your department — Maths, Science, or any subject. Upload your scheme of work (or build it here) to get started. Your teachers will see it the moment it\'s live.'
+        : 'Your Head of Department hasn\'t set up the scheme of work yet. Once they upload it, your classes and topics will appear here automatically.'}
+    </div>
+    ${hod?`<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button onclick="_reRunSetup()" class="btna btn" style="font-size:13px;padding:10px 20px;">📥 Upload a scheme</button>
+      <button onclick="YID='__curric';DASH=false;render()" class="btn" style="font-size:13px;padding:10px 20px;">✏️ Build one here</button>
+    </div>`:`<div style="font-size:12px;color:var(--text3);">You'll get a notification here once it's ready. 👋</div>`}
+  </div>`;
+}
 function renderDashboard(){
+  if(!allCls().length){ renderNoScheme(); return; } // blank / subject-agnostic start
   const cw=getCW(), classes=allCls(), tn=Ts(); // dashboard always uses all teachers for dept health
 
   // Alignment score
@@ -6772,7 +6837,7 @@ function renderAddCls(){
       <button onclick="clrMe()" class="btn" style="color:var(--red);border-color:rgba(255,79,110,.3);font-size:12px;">Reset my progress</button>
       ${isHoD()?`<button onclick="clearScheme()" class="btn" style="color:var(--red);border-color:rgba(255,79,110,.3);font-size:12px;">🗑 Clear scheme</button>
       <button onclick="_reRunSetup()" class="btna btn" style="font-size:12px;">📂 Upload new scheme</button>`:''}
-      <button onclick="showConfirm('Clear ALL data and start fresh?\nThis cannot be undone.',function(){localStorage.clear();location.reload();})" class="btn" style="color:var(--red);border-color:rgba(255,79,110,.3);font-size:12px;">⚠ Clear all data</button>
+      ${isHoD()?`<button onclick="startFresh()" class="btn" style="color:var(--red);border-color:rgba(255,79,110,.45);font-size:12px;font-weight:600;">⚠ Start fresh (clear everything)</button>`:''}
       <button onclick="const r=runTests();showToast(r.ok?'✅ All '+r.total+' tests passed':\`❌ \${r.failed.length} failed — check console\`)" class="btn" style="font-size:12px;">🧪 Run tests</button>
     </div>`:'<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Set your name (top-right) to manage your year group assignments.</div>'}
 
@@ -7405,17 +7470,19 @@ function setupSaveConfig(){
 function finishSetup(){
   setupSaveConfig();
   if(SETUP_DATA.parsedClasses){
-    try{localStorage.setItem(SOL_KEY,JSON.stringify(SETUP_DATA.parsedClasses));}catch(e){}
     // Merge parsed classes into live PD
     SETUP_DATA.parsedClasses.forEach(nc=>{
       const idx=PD.classes.findIndex(c=>c.id===nc.id);
       if(idx>-1) PD.classes[idx]=nc; else PD.classes.push(nc);
     });
+    try{localStorage.setItem(SOL_KEY,JSON.stringify(PD.classes));}catch(e){}
+    // Server HoD: push the uploaded scheme so it persists and teachers receive it.
+    if(localStorage.getItem(LF_GCODE_KEY)&&getRole()==='hod') syncSoWToServer().catch(()=>{});
   }
   SETUP=false;
   _releaseSetupTrap();
   if(!U) MODAL=true;
-  YID=PD.classes[0]?.id||'y7';
+  YID=PD.classes[0]?.id||null; // may be blank if no scheme uploaded
   render();
 }
 
