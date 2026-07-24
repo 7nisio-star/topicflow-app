@@ -7332,7 +7332,7 @@ function renderSetup(){
         ${parsed?'Review extracted topics':'Ready to launch'}
       </h2>
       <p style="color:var(--text2);font-size:13px;margin-bottom:20px;">
-        ${parsed?`Found ${parsed.length} year group${parsed.length!==1?'s':''} in your document. Check the topics look right before saving.`:'Using the built-in Maths 2025/26 curriculum. You can upload your own scheme later via Settings.'}
+        ${parsed?`Found ${parsed.length} year group${parsed.length!==1?'s':''} in your document. Check the topics look right before saving.`:'No scheme uploaded — you\'ll start with a blank curriculum. You can upload a file or build one from the dashboard after launch.'}
       </p>
 
       ${parsed?parsed.map((cls,ci)=>`
@@ -7361,7 +7361,7 @@ function renderSetup(){
           </div>
         </div>`).join(''):
         `<div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:13px;color:var(--text2);">
-          ✓ Built-in curriculum: Year 7–13 Maths, 40-week year, topics pre-loaded.
+          📚 You'll start with a blank curriculum — Maths, Science or any subject. Upload your scheme of work or build it topic-by-topic once you're in.
         </div>`}
 
       <div style="background:rgba(0,212,173,.07);border:1px solid rgba(0,212,173,.2);border-radius:10px;padding:14px;margin-top:8px;">
