@@ -408,11 +408,13 @@ export default async (req) => {
       if (!group) return json(404, { error: 'Group not found.' });
 
       if (method === 'GET' && parts[2] === 'sow' && parts.length === 3) {
-        return json(200, { data: group.sow.data, updatedAt: group.sow.updatedAt });
+        // weekDates = the term calendar, so teachers on any device get the same
+        // "current week" as the HoD (read from the uploaded scheme's dates).
+        return json(200, { data: group.sow.data, weekDates: group.sow.weekDates || null, updatedAt: group.sow.updatedAt });
       }
       if (method === 'PUT' && parts[2] === 'sow' && parts.length === 3) {
         if (tokRec.role !== 'hod') return json(403, { error: 'HoD only.' });
-        group.sow = { data: body.data, updatedAt: Date.now() };
+        group.sow = { data: body.data, weekDates: body.weekDates || null, updatedAt: Date.now() };
         await saveGroup(group);
         return json(200, { ok: true });
       }
