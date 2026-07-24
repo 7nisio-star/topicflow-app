@@ -2319,13 +2319,27 @@ function saveCurric(){
   goY(cls.id);
 }
 function ceImportFromExcel(){
+  if(!isHoD()){showToast('Only the Head of Department can import a scheme.');return;}
   const inp=document.createElement('input');
   inp.type='file';inp.accept='.xlsx,.xls,.csv';
   inp.onchange=async e=>{
     const file=e.target.files[0];if(!file) return;
     try{
-      const text=await readSpreadsheet(file);
-      showToast('File read. Configure AI on step 2 of Setup to auto-extract topics, or enter them manually.');
+      const rows=await _readRowsFromFile(file);
+      const parsed=_tryMatrixParse(rows);
+      if(parsed&&parsed.length){
+        parsed.forEach(nc=>{
+          const idx=PD.classes.findIndex(c=>c.id===nc.id||c.name===nc.name);
+          if(idx>-1) PD.classes[idx]=nc; else PD.classes.push(nc);
+        });
+        CE.cls=PD.classes.find(c=>c.name===parsed[0].name)||PD.classes[0];
+        try{localStorage.setItem(SOL_KEY,JSON.stringify(PD.classes));}catch(e){}
+        if(localStorage.getItem(LF_GCODE_KEY)&&getRole()==='hod') syncSoWToServer().catch(()=>{});
+        showToast('✓ Imported '+parsed.length+' year group'+(parsed.length!==1?'s':'')+' from your timeline.');
+        DASH=false; YID='__curric'; renderCurricEditor();
+      } else {
+        showToast('Couldn\'t detect year-group columns. Try Settings → Upload new scheme for guided column mapping.');
+      }
     }catch(err){showToast('Could not read file: '+err.message);}
   };
   inp.click();
@@ -7619,9 +7633,107 @@ async function quickReadFile(){
     renderSetup();
   }
 }
+// Read an xlsx/xls/csv file into an array-of-rows grid (shared by the in-editor import).
+async function _readRowsFromFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='xlsx'||ext==='xls'){
+    if(!window.XLSX) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{header:1,defval:''}).filter(r=>r.some(v=>String(v).trim()));
+  }
+  if(ext==='csv'){
+    if(!window.XLSX) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+    const wb=XLSX.read(await file.text(),{type:'string'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{header:1,defval:''}).filter(r=>r.some(v=>String(v).trim()));
+  }
+  throw new Error('Unsupported file type: '+ext);
+}
 
+/* ════ MATRIX / TIMELINE CURRICULUM PARSER ════════════════════════
+   Many schemes of work are laid out as a *timeline matrix*: year groups
+   are COLUMNS (Y7, Y8, Y9, Y10 Higher/Foundation, Y11…), weeks run DOWN
+   the rows, and each cell is the topic taught that week. The tidy/long
+   parser below (one topic per row + a single "year" column) can't read
+   these — it dumps everything into one group. This detects the matrix
+   shape and reads each year-group column into its own class, deriving
+   topic week-spans from where each new topic label starts.
+   ═══════════════════════════════════════════════════════════════════ */
+function _cleanClsName(h){
+  h=String(h||'').replace(/\r?\n/g,' ');
+  h=h.replace(/\bcurriculum\b/ig,'');
+  h=h.replace(/\*.*$/,'');              // drop trailing *notes
+  h=h.replace(/see bespoke.*$/i,'');
+  h=h.replace(/\s+/g,' ').trim();
+  h=h.replace(/\bY7\b/gi,'Year 7').replace(/\bY8\b/gi,'Year 8').replace(/\bY9\b/gi,'Year 9')
+     .replace(/\bY10\b/gi,'Year 10').replace(/\bY11\b/gi,'Year 11').replace(/\bY12\b/gi,'Year 12').replace(/\bY13\b/gi,'Year 13');
+  return h.trim();
+}
+function _tryMatrixParse(rows){
+  const YEAR_RE=/\b(y|yr|year)\s*(7|8|9|10|11|12|13)\b/i;
+  const HL_RE=/higher|foundation/i;
+  const BAD_HDR=/data|assessment|calendar/i;
+  const WEEK_RE=/^\s*(week|wk)\b/i;
+  const BLANK_RE=/^(blank|tal camp|inset|half term|christmas|easter|moved from|the following|opportunity to|no circ)\b/i;
+  const isYearCol=c=>{c=String(c||'');return c&&(YEAR_RE.test(c)||HL_RE.test(c))&&!BAD_HDR.test(c);};
+  const maxW=(typeof PD!=='undefined'&&PD.weeks)?PD.weeks:40;
+  // Header row = the row (within the first 8) with the most year-group columns.
+  let hdrIdx=-1, best=1;
+  for(let i=0;i<Math.min(rows.length,8);i++){
+    let cnt=0; (rows[i]||[]).forEach(cell=>{ if(isYearCol(cell)) cnt++; });
+    if(cnt>best){ best=cnt; hdrIdx=i; }
+  }
+  if(hdrIdx<0) return null;               // not a matrix layout
+  const hdr=rows[hdrIdx];
+  let weekCol=-1;
+  for(let j=0;j<hdr.length;j++){ if(WEEK_RE.test(String(hdr[j]||''))){ weekCol=j; break; } }
+  const yCols=[];
+  for(let j=0;j<hdr.length;j++){ if(isYearCol(hdr[j])) yCols.push(j); }
+  if(yCols.length<2) return null;
+  const YR_COLORS=['#6c56f5','#00c9a7','#ffaa40','#ff4f6e','#9b72e0','#3dce7a','#e05a8a','#4ad4e0','#e0a820','#8ae060','#e05a5a','#4a8fe0'];
+  const usedNames={};
+  const parsed=[];
+  yCols.forEach((j,gi)=>{
+    let nm=_cleanClsName(hdr[j])||('Class '+(gi+1));
+    if(usedNames[nm]){ usedNames[nm]++; nm=nm+' ('+usedNames[nm]+')'; } else usedNames[nm]=1;
+    const entries=[]; let curWeek=null, seq=0;
+    for(let i=hdrIdx+1;i<rows.length;i++){
+      const row=rows[i]||[];
+      // Track the current week: from the week column if present, else sequential
+      const wv=weekCol>=0?String(row[weekCol]||'').trim():'';
+      if(weekCol>=0){ if(/^\d+$/.test(wv)) curWeek=parseInt(wv,10); }
+      const cellRaw=String(row[j]||'');
+      const name=cellRaw.split(/\r?\n/)[0].trim();
+      if(!name||name.charAt(0)==='*'||BLANK_RE.test(name)) continue; // skip blanks & footnotes
+      if(weekCol<0){ curWeek=(++seq); }        // no week column → row order
+      if(curWeek==null) continue;
+      if(entries.length&&entries[entries.length-1].name===name) continue; // same topic continues
+      if(curWeek>maxW) continue;
+      entries.push({week:curWeek,name});
+    }
+    if(!entries.length) return;               // skip empty year columns
+    const topics=entries.map((e,k)=>{
+      let end=k+1<entries.length?entries[k+1].week-1:maxW;
+      end=Math.max(e.week,Math.min(end,maxW));
+      return {id:'imp_'+gi+'_'+k, name:e.name.slice(0,120), start:e.week, end};
+    });
+    parsed.push({ id:'imported_'+gi, name:nm, color:YR_COLORS[parsed.length%YR_COLORS.length], _custom:true, topics });
+  });
+  return parsed.length?parsed:null;
+}
 function autoMapRows(rows){
   if(!rows||!rows.length){renderSetup();return;}
+  // Timeline/matrix layout first (year groups as columns) — the tidy parser can't read these.
+  const matrix=_tryMatrixParse(rows);
+  if(matrix&&matrix.length){
+    SETUP_DATA.parsedClasses=matrix;
+    SETUP_DATA.processing=false;
+    SETUP_STEP=4; renderSetup();
+    showToast('✓ Read '+matrix.length+' year group'+(matrix.length!==1?'s':'')+' from your timeline.');
+    return;
+  }
   const header=rows[0].map(v=>String(v).toLowerCase());
   // Find topic name column (looks for 'topic', 'name', 'title', 'unit' or first text col)
   const nameCol=header.findIndex(h=>/(topic|name|title|unit|content|subject)/i.test(h));
