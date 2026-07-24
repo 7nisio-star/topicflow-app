@@ -1520,12 +1520,21 @@ async function pollHoDProgress(){
     }
   }catch(e){}
 }
+// Re-render after a background poll, but NOT while the HoD is typing — a
+// full render() rebuilds the DOM and would wipe an in-progress input (a class
+// name, topic name, note, etc.). Skip the refresh in that case; the next poll
+// (or the user's own action) will pick up the data.
+function _renderUnlessTyping(){
+  const ae=document.activeElement, tag=ae&&ae.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+  render();
+}
 function startHoDPolling(){
   if(_hodPollTimer) return;
   // Immediate first fetch so HoD sees live data on entry (not just after 60s)
-  pollHoDProgress().then(()=>render()).catch(()=>{});
+  pollHoDProgress().then(()=>_renderUnlessTyping()).catch(()=>{});
   _hodPollTimer=setInterval(()=>{
-    if(getRole()==='hod') pollHoDProgress().then(()=>render()).catch(()=>{});
+    if(getRole()==='hod') pollHoDProgress().then(()=>_renderUnlessTyping()).catch(()=>{});
   },30000);
 }
 /* ════ PEER ACTIVITY FEED ════════════════════════════════════════
