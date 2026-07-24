@@ -902,16 +902,16 @@ body.light #topbar,body.light #scope-bar,body.light #view-tabs{background:rgba(2
           <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
         </svg>
       </button>
-      <!-- This Week -->
+      <!-- This Week (department overview) — distinct 'list of classes' icon -->
       <button class="rail-btn" id="rail-thisweek" onclick="SIMPLE_MODE=false;localStorage.setItem('lf_simple','0');DASH=false;YID='__thisweek';render()" title="This week">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          <rect x="7" y="14" width="4" height="4" rx="1" fill="currentColor" stroke="none"/>
+          <circle cx="4" cy="6" r="1.4" fill="currentColor" stroke="none"/><line x1="9" y1="6" x2="20" y2="6"/>
+          <circle cx="4" cy="12" r="1.4" fill="currentColor" stroke="none"/><line x1="9" y1="12" x2="20" y2="12"/>
+          <circle cx="4" cy="18" r="1.4" fill="currentColor" stroke="none"/><line x1="9" y1="18" x2="20" y2="18"/>
         </svg>
       </button>
-      <!-- Gantt / Calendar -->
-      <button class="rail-btn" id="rail-gantt" onclick="SIMPLE_MODE=false;DASH=false;if(VIEW==='checkin')VIEW='gantt';render()" title="Term plan / Gantt">
+      <!-- Gantt / Calendar — ensure a class is selected so it never lands on a blank page -->
+      <button class="rail-btn" id="rail-gantt" onclick="SIMPLE_MODE=false;DASH=false;if(!getCls(YID))YID=(allCls()[0]||{}).id;if(VIEW==='checkin')VIEW='gantt';render()" title="Term plan / Gantt">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/>
           <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
