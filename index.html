@@ -1476,7 +1476,7 @@ async function syncSoWFromServer(){
   if(!gcode) return;
   try{
     const resp=await lfApi.get('/groups/'+gcode+'/sow');
-    // Backend returns { data: [...classes] | null, updatedAt }
+    // Backend returns { data: [...classes] | null, weekDates, updatedAt }
     const classes=resp&&resp.data;
     if(classes&&Array.isArray(classes)&&classes.length){
       classes.forEach(nc=>{
@@ -1484,13 +1484,19 @@ async function syncSoWFromServer(){
         if(idx>-1) PD.classes[idx]=nc; else PD.classes.push(nc);
       });
     }
+    // Adopt the department's term calendar so every teacher's "current week"
+    // matches the HoD's uploaded scheme dates — not just on the HoD's device.
+    if(resp&&resp.weekDates&&Object.keys(resp.weekDates).length>=5){
+      PD.weekDates=resp.weekDates;
+      try{ savCal(Object.assign(getCal(),{weekDates:resp.weekDates, termStart:resp.weekDates['1']})); }catch(e){}
+    }
   }catch(e){}
 }
 async function syncSoWToServer(){
   const gcode=localStorage.getItem(LF_GCODE_KEY);
   if(!gcode||getRole()!=='hod') return;
-  // Backend expects { data: <classes array> }
-  try{await lfApi.put('/groups/'+gcode+'/sow',{data:PD.classes});}catch(e){}
+  // Push classes + the term calendar so teachers get accurate week dates.
+  try{await lfApi.put('/groups/'+gcode+'/sow',{data:PD.classes, weekDates:PD.weekDates});}catch(e){}
 }
 
 /* ─── Progress sync ─── */
@@ -6124,7 +6130,13 @@ function render(){
   if(YID==='__slt'){ renderSLT(); return; }
   if(YID==='__profile'){ renderProfile(); return; }
   const cls=getCls(YID);
-  if(!cls){ document.getElementById('content').innerHTML=''; return; }
+  if(!cls){
+    // YID points to no valid class (stale id, or a view button pressed with no
+    // scheme). Never leave a blank dead-end: fall back to the first class, else
+    // the blank-start prompt.
+    if(allCls().length){ YID=allCls()[0].id; DASH=false; render(); return; }
+    renderNoScheme(); return;
+  }
 
   // View tabs are now rendered in the unified topbar (see tb-tabs above)
   // Old #view-tabs and #scope-bar are hidden by CSS — no style overrides needed
