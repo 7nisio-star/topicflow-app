@@ -1967,7 +1967,26 @@ function renderCurricEditor(){
   const co=document.getElementById('content');
   co.style.overflowY='auto';
   const cls=CE.cls||allCls()[0];
-  if(!cls){co.innerHTML='<div style="padding:24px;color:var(--text2);">No class selected.</div>';return;}
+  if(!cls){
+    // Blank start: no classes yet. Let the HoD create their first class here
+    // (previously this dead-ended at "No class selected.").
+    if(isHoD()){
+      co.innerHTML=`<div style="max-width:460px;margin:8vh auto;text-align:center;padding:24px;">
+        <div style="font-size:44px;margin-bottom:12px;">🗂️</div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:8px;">Add your first class</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.6;">Create a class or year group — e.g. "Year 7", "Year 10 Foundation", "GCSE Biology". You'll add topics and small steps next.</div>
+        <div style="display:flex;gap:8px;max-width:340px;margin:0 auto;">
+          <input id="ce-first-class" class="sfield" placeholder="e.g. Year 7" style="flex:1;font-size:14px;padding:10px 12px;" onkeydown="if(event.key==='Enter')ceAddClass(this.value)">
+          <button onclick="ceAddClass(document.getElementById('ce-first-class').value)" class="btna btn" style="font-size:13px;padding:10px 18px;">Add class</button>
+        </div>
+        <div style="margin-top:16px;"><button onclick="_reRunSetup()" class="btn" style="font-size:12px;">…or upload a scheme file instead</button></div>
+      </div>`;
+    } else {
+      co.innerHTML='<div style="padding:24px;color:var(--text2);text-align:center;">No scheme yet — your HoD will set this up.</div>';
+    }
+    setTimeout(()=>{const el=document.getElementById('ce-first-class');if(el)el.focus();},50);
+    return;
+  }
   // Keep CE.cls in sync with what's actually displayed. Every entry point into the
   // editor (topbar "Edit curriculum", empty-state "Set up the curriculum" buttons)
   // sets YID='__curric' directly rather than going through openCurricEditor(), so
@@ -2046,6 +2065,7 @@ function renderCurricEditor(){
         ${allCls().map(c2=>`<option value="${c2.id}" ${c2.id===cls.id?'selected':''}>${c2.name}</option>`).join('')}
       </select>
       ${hod?'<button onclick="ceAddTopic(null)" class="btna btn" style="font-size:12px;">+ Add topic</button>':''}
+      ${hod?`<button onclick="(function(){const n=prompt('Name of the new class / year group:');if(n)ceAddClass(n);})()" class="btn" style="font-size:12px;">+ Class</button>`:''}
       ${hod?'<button onclick="ceImportFromExcel()" class="btn" style="font-size:12px;">📥 Import Excel</button>':''}
       ${hod?'<button onclick="renderStrandManager()" class="btn" style="font-size:12px;">🗂 Golden threads</button>':''}
       ${hod?'<button onclick="suggestThreadOrder()" class="btn" style="font-size:12px;">✨ Suggest order</button>':''}
@@ -2234,6 +2254,22 @@ function ceAddTopic(startWeek){
   const sw=startWeek||lastEnd+1;
   cls.topics.push({id:cls.id+'_'+Date.now(),name:'New topic',start:sw,end:sw});
   ceRelayout(); renderCurricEditor();
+}
+// Create a new class / year group. Powers the blank-start "Add your first class"
+// empty state and the "+ Class" header button. Persists locally + to the server.
+function ceAddClass(name){
+  if(!isHoD()){showToast('Only the Head of Department can add classes.');return;}
+  name=(name||'').trim();
+  if(!name){showToast('Enter a class name first.');return;}
+  const cols=['#6c56f5','#00c9a7','#ffaa40','#ff4f6e','#9b72e0','#3dce7a','#4a8fe0','#e05a8a'];
+  const cls={id:'cls_'+Date.now(),name:name,color:cols[allCls().length%cols.length],topics:[],_custom:true};
+  PD.classes.push(cls);
+  CE.cls=cls;
+  try{localStorage.setItem(SOL_KEY,JSON.stringify(PD.classes));}catch(e){}
+  if(localStorage.getItem(LF_GCODE_KEY)&&getRole()==='hod') syncSoWToServer().catch(()=>{});
+  DASH=false; YID='__curric';
+  showToast('✓ '+name+' added — now add its topics');
+  renderCurricEditor();
 }
 function ceRelayout(){
   relayoutClassTopics(CE.cls);
