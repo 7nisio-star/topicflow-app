@@ -5701,7 +5701,8 @@ function renderAddCls(){
           if(!name||!email||!pw){showToast('Fill in all fields');return;}
           try{
             const tok=localStorage.getItem('lf_api_token');
-            const sid=JSON.parse(atob(tok.split('.')[1])).school_id;
+            const tokenParts=tok.split('.');
+            const sid=tokenParts.length>1?JSON.parse(atob(tokenParts[1].replace(/-/g,'+').replace(/_/g,'/'))).school_id:'';
             const r=await fetch(API._url+'/api/auth/invite',{
               method:'POST',headers:API.headers(),
               body:JSON.stringify({name,email,password:pw,school_id:sid})
