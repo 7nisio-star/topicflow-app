@@ -1377,7 +1377,7 @@ function validateCls(arr){
   });
 }
 // ↓ Edit this date before distributing to set expiry (null = never expires)
-const APP_LICENCE_EXPIRY='2026-07-31';
+const APP_LICENCE_EXPIRY='2026-12-17';
 const APP_EXPIRES=APP_LICENCE_EXPIRY;
 
 function checkExpiry(){
@@ -1780,6 +1780,16 @@ function showHelp(){
     const dow=sep1.getDay();
     const firstMon=new Date(yr,8, dow<=1?1+(1-dow):8-(dow-1));
     PD.startDate=firstMon.toISOString().split('T')[0];
+  }
+  // Default week-date map so getCW()/wDate()/wLabel() always have data,
+  // even before the user configures Settings → School Calendar.
+  if(!PD.weekDates){
+    PD.weekDates={};
+    const start=new Date(PD.startDate);
+    for(let w=1; w<=PD.weeks; w++){
+      const d=new Date(start.getTime()+(w-1)*7*24*60*60*1000);
+      PD.weekDates[String(w)]=d.toISOString().slice(0,10);
+    }
   }
   try{T=validateT(JSON.parse(localStorage.getItem(TK))||{});}catch(e){T={};}  
   try{U=localStorage.getItem(UK);}catch(e){}
@@ -3096,6 +3106,7 @@ function renderCheckin(cls){
 
 /* ════ DATE HELPERS ════ */
 function getCW(){
+  if(!PD.weekDates) return 1;
   const t=new Date().toISOString().slice(0,10); let w=1;
   Object.entries(PD.weekDates).forEach(([k,v])=>{if(v<=t)w=Math.max(w,+k);});
   return w;
