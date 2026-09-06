@@ -1443,6 +1443,19 @@ const API = {
     return data;
   },
 
+  async joinWithCode(code, name, email, password) {
+    const r = await fetch(this._url + '/api/auth/join-school', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({code, name, email, password})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not join school');
+    this._tok = data.token;
+    localStorage.setItem('lf_api_token', this._tok);
+    return data;
+  },
+
   // Push local state to server (called after every setSts/savNoteTyped)
   async push(name) {
     if (!this.configured()) return;
@@ -5566,7 +5579,7 @@ function renderAddCls(){
           <div id="api-mode" style="display:flex;gap:6px;margin-bottom:14px;">
             <button onclick="document.getElementById('api-login-form').style.display='block';document.getElementById('api-register-form').style.display='none';document.getElementById('api-invite-form').style.display='none';" class="btn" style="font-size:11px;font-weight:700;">Sign in</button>
             <button onclick="document.getElementById('api-register-form').style.display='block';document.getElementById('api-login-form').style.display='none';document.getElementById('api-invite-form').style.display='none';" class="btn" style="font-size:11px;">Register school (HoD)</button>
-            <button onclick="document.getElementById('api-invite-form').style.display='block';document.getElementById('api-login-form').style.display='none';document.getElementById('api-register-form').style.display='none';" class="btn" style="font-size:11px;">Join school (Teacher)</button>
+            <button onclick="document.getElementById('api-invite-form').style.display='block';document.getElementById('api-login-form').style.display='none';document.getElementById('api-register-form').style.display='none';" class="btn" style="font-size:11px;">Join with code (Teacher)</button>
           </div>
 
           <!-- API URL (shared) -->
@@ -5592,6 +5605,7 @@ function renderAddCls(){
                 const d=await API.login(email,pw);
                 U=d.user.name; savU();
                 setRole(d.user.role);
+                if(d.join_code){try{localStorage.setItem('lf_school_code',d.join_code);}catch(e){}}
                 showToast('\u2713 Signed in as '+d.user.name);
                 await API.pullScheme();
                 await API.pull();
@@ -5627,30 +5641,38 @@ function renderAddCls(){
                 const d=await API.register(name,email,pw,school);
                 U=d.user.name; savU();
                 setRole('hod');
-                showToast('✓ School registered! Welcome, '+d.user.name);
+                if(d.join_code){try{localStorage.setItem('lf_school_code',d.join_code);}catch(e){}}
+                showToast('✓ School registered! Your teacher join code is '+d.join_code+' — share it with your team.');
                 render();
               }catch(e){showToast('❌ '+e.message);}
             })();">Register school →</button>
           </div>
 
-          <!-- JOIN FORM (Teacher) -->
+          <!-- JOIN FORM (Teacher, via school code) -->
           <div id="api-invite-form" style="display:none;">
-            <div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 8px;background:var(--panel3);border-radius:6px;">Your HoD creates your account and gives you the email and password to use here.</div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 8px;background:var(--panel3);border-radius:6px;">Ask your HoD for the school join code, then set up your own account below.</div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">School code</div>
+            <input id="api-join-code" class="sfield" placeholder="e.g. K7P3QX" style="width:100%;margin-bottom:8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Your name</div>
+            <input id="api-join-name" class="sfield" placeholder="Mr Patel" style="width:100%;margin-bottom:8px;font-size:12px;">
             <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Email</div>
-            <input id="api-inv-email" class="sfield" type="email" placeholder="your school email" style="width:100%;margin-bottom:8px;font-size:12px;">
+            <input id="api-join-email" class="sfield" type="email" placeholder="your school email" style="width:100%;margin-bottom:8px;font-size:12px;">
             <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Password</div>
-            <input id="api-inv-pw" class="sfield" type="password" placeholder="••••••••" style="width:100%;margin-bottom:10px;font-size:12px;">
+            <input id="api-join-pw" class="sfield" type="password" placeholder="min 8 characters" style="width:100%;margin-bottom:10px;font-size:12px;">
             <button class="btna btn" style="width:100%;font-size:13px;font-weight:700;" onclick="(async()=>{
               const url=document.getElementById('api-url-input').value.trim();
-              const email=document.getElementById('api-inv-email').value.trim();
-              const pw=document.getElementById('api-inv-pw').value;
-              if(!url||!email||!pw){showToast('Fill in all fields');return;}
+              const code=document.getElementById('api-join-code').value.trim();
+              const name=document.getElementById('api-join-name').value.trim();
+              const email=document.getElementById('api-join-email').value.trim();
+              const pw=document.getElementById('api-join-pw').value;
+              if(!url||!code||!name||!email||!pw){showToast('Fill in all fields');return;}
+              if(pw.length<8){showToast('Password must be 8+ characters');return;}
               API.setConfig(url,'temp');
               try{
-                const d=await API.login(email,pw);
+                const d=await API.joinWithCode(code,name,email,pw);
                 U=d.user.name; savU();
                 setRole(d.user.role||'teacher');
-                showToast('\u2713 Joined! Loading your school\'s curriculum...');
+                showToast('\u2713 Joined '+(d.school_name||'your school')+'! Loading curriculum...');
                 // Show loading state immediately
                 const _co=document.getElementById('co');
                 if(_co) _co.innerHTML='<div style=&quot;display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;&quot;><div style=&quot;font-size:32px;&quot;>⏳</div><div style=&quot;font-size:15px;font-weight:700;&quot;>Loading your school\'s curriculum...</div><div style=&quot;font-size:12px;color:var(--text3);&quot;>This only takes a moment</div></div>';
@@ -5658,9 +5680,7 @@ function renderAddCls(){
                 const _scheme = await API.pullScheme();
                 await API.pull();
                 if(allCls().length) YID=allCls()[0].id;
-                const jr2=d.user.role||'teacher';
-                if(jr2==='hod'||jr2==='slt'){SIMPLE_MODE=false;localStorage.setItem('lf_simple','0');DASH=true;}
-                else{SIMPLE_MODE=true;localStorage.setItem('lf_simple','1');}
+                SIMPLE_MODE=true;localStorage.setItem('lf_simple','1');
                 if(_scheme){
                   showToast('\u2713 School curriculum loaded — '+allCls().length+' classes');
                 } else {
@@ -5674,6 +5694,24 @@ function renderAddCls(){
         `}
       </div>
 
+      ${isHoD()&&API.configured()?`
+      <div class="sec-l">Your school join code</div>
+      <div style="background:var(--panel2);border-radius:10px;padding:12px;margin-bottom:14px;">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Share this code with your teachers — they enter it under "Join with code" to set up their own account and sync straight to your department.</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div id="school-code-display" style="flex:1;font-size:20px;font-weight:800;letter-spacing:.12em;background:var(--panel3);border-radius:8px;padding:10px 14px;text-align:center;">${localStorage.getItem('lf_school_code')||'—'}</div>
+          <button class="btn" style="font-size:12px;" onclick="navigator.clipboard.writeText(document.getElementById('school-code-display').textContent).then(()=>showToast('✓ Code copied'))">📋 Copy</button>
+        </div>
+        ${!localStorage.getItem('lf_school_code')?`<button class="btn" style="font-size:11px;margin-top:8px;" onclick="(async()=>{
+          try{
+            const r=await fetch(API._url+'/api/auth/me',{headers:API.headers()});
+            const d=await r.json();
+            if(!r.ok) throw new Error(d.error||'Could not fetch code');
+            if(d.join_code){localStorage.setItem('lf_school_code',d.join_code);render();}
+            else showToast('No code found for this school yet.');
+          }catch(e){showToast('❌ '+e.message);}
+        })();">↻ Fetch my code</button>`:''}
+      </div>`:''}
       <!-- HoD: Invite a teacher -->
       ${isHoD()?`
       <div class="sec-l">Departmental question bank <span style="font-size:10px;font-weight:400;color:var(--text3);">(sets retrieval questions for all teachers)</span></div>
