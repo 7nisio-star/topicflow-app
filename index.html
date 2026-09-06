@@ -6313,7 +6313,48 @@ function renderSetup(){
               <div style="font-size:10px;color:var(--text2);margin-top:2px;">See all teachers</div>
             </div>
           </div>
+        </div>
+
+        ${SETUP_DATA.role!=='hod'?`
+        <div style="background:var(--panel2);border:1px solid var(--border2);border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:700;margin-bottom:10px;">How do you want to use LessonFlow?</div>
+          <div style="display:flex;gap:8px;margin-bottom:${SETUP_DATA.joinMode==='code'?'12':'0'}px;">
+            <div onclick="SETUP_DATA.joinMode='solo';renderSetup();"
+              style="flex:1;padding:10px;border-radius:8px;cursor:pointer;text-align:center;border:1.5px solid ${SETUP_DATA.joinMode!=='code'?'var(--acc)':'var(--border2)'};background:${SETUP_DATA.joinMode!=='code'?'rgba(124,99,248,.1)':'var(--panel)'};">
+              <div style="font-size:12px;font-weight:700;">📓 Just for me</div>
+              <div style="font-size:10px;color:var(--text2);margin-top:2px;">Track my own lessons</div>
+            </div>
+            <div onclick="SETUP_DATA.joinMode='code';renderSetup();"
+              style="flex:1;padding:10px;border-radius:8px;cursor:pointer;text-align:center;border:1.5px solid ${SETUP_DATA.joinMode==='code'?'var(--teal)':'var(--border2)'};background:${SETUP_DATA.joinMode==='code'?'rgba(0,212,173,.1)':'var(--panel)'};">
+              <div style="font-size:12px;font-weight:700;">👥 Join my department</div>
+              <div style="font-size:10px;color:var(--text2);margin-top:2px;">Sync with my team</div>
+            </div>
+          </div>
+          ${SETUP_DATA.joinMode==='code'?`
+          <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:8px;background:var(--panel3);border-radius:6px;">Ask your HoD for the school join code. Everyone who joins this way sees the same curriculum and syncs together.</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Backend URL</div>
+          <input class="sfield" id="wiz-join-url" placeholder="https://lessonflow-api-xxxx.railway.app"
+            value="${localStorage.getItem('lf_api_url_draft')||localStorage.getItem('lf_api_url')||''}"
+            style="width:100%;margin-bottom:8px;font-size:12px;"
+            oninput="localStorage.setItem('lf_api_url_draft',this.value)">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">School code</div>
+          <input class="sfield" id="wiz-join-code" placeholder="e.g. K7P3QX"
+            value="${SETUP_DATA.wizJoinCode||''}"
+            oninput="SETUP_DATA.wizJoinCode=this.value"
+            style="width:100%;margin-bottom:8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Email</div>
+          <input class="sfield" id="wiz-join-email" type="email" placeholder="your school email"
+            value="${SETUP_DATA.wizJoinEmail||''}"
+            oninput="SETUP_DATA.wizJoinEmail=this.value"
+            style="width:100%;margin-bottom:8px;font-size:12px;">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Password</div>
+          <input class="sfield" id="wiz-join-pw" type="password" placeholder="min 8 characters"
+            value="${SETUP_DATA.wizJoinPw||''}"
+            oninput="SETUP_DATA.wizJoinPw=this.value"
+            style="width:100%;font-size:12px;">
+          `:''}
         </div>`:''}
+      `:''}
 
       <div class="setup-nav">
         <button class="sbtn-skip" onclick="SETUP=false;const _ov=document.getElementById('setup-overlay');if(_ov)_ov.style.display='none';render();">✕ Cancel</button>
@@ -6522,6 +6563,13 @@ function setupAuth(){
   if(sd.authType==='guest'){
     const n=(document.getElementById('guest-name')||{}).value||sd.guestName||'';
     if(!n.trim()){showToast('Please enter your name to continue.');return;}
+    // Teacher choosing to join their department by code skips the rest of
+    // the wizard entirely — they'll pull the department's existing
+    // curriculum instead of configuring AI/uploading a scheme themselves.
+    if(sd.role!=='hod'&&sd.joinMode==='code'){
+      setupJoinWithCode(n.trim());
+      return;
+    }
     // Store role explicitly, not just in name
     setRole(sd.role==='hod'?'hod':'teacher');
     // Append HoD marker to name if role is HoD
@@ -6533,6 +6581,37 @@ function setupAuth(){
     signInGoogle();return;
   }
   SETUP_STEP=2; renderSetup();
+}
+
+async function setupJoinWithCode(name){
+  const sd=SETUP_DATA;
+  const url=((document.getElementById('wiz-join-url')||{}).value||'').trim();
+  const code=((document.getElementById('wiz-join-code')||{}).value||sd.wizJoinCode||'').trim();
+  const email=((document.getElementById('wiz-join-email')||{}).value||sd.wizJoinEmail||'').trim();
+  const pw=(document.getElementById('wiz-join-pw')||{}).value||sd.wizJoinPw||'';
+  if(!url||!code||!email||!pw){showToast('Fill in the backend URL, school code, email and password.');return;}
+  if(pw.length<8){showToast('Password must be 8+ characters');return;}
+  API.setConfig(url,'temp');
+  try{
+    const d=await API.joinWithCode(code,name,email,pw);
+    U=d.user.name; savU();
+    setRole(d.user.role||'teacher');
+    showToast('\u2713 Joined '+(d.school_name||'your school')+'! Loading curriculum...');
+    SETUP=false;
+    const ov=document.getElementById('setup-overlay');
+    if(ov) ov.style.display='none';
+    SIMPLE_MODE=true; localStorage.setItem('lf_simple','1');
+    render();
+    const _scheme=await API.pullScheme();
+    await API.pull();
+    if(allCls().length) YID=allCls()[0].id;
+    if(_scheme){
+      showToast('\u2713 School curriculum loaded — '+allCls().length+' classes');
+    }else{
+      showToast('\u26a0 No school curriculum found. Ask your HoD to upload a scheme of work.');
+    }
+    render();
+  }catch(e){showToast('❌ '+e.message);}
 }
 
 function setupSaveConfig(){
