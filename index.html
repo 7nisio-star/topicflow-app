@@ -1662,6 +1662,68 @@ const QS_KEY='lf_qs';
 function getQuestions(tid){try{return JSON.parse(localStorage.getItem(QS_KEY)||'{}')[tid]||[];}catch(e){return [];}}
 function saveQuestions(tid,qs){try{const a=JSON.parse(localStorage.getItem(QS_KEY)||'{}');a[tid]=qs;localStorage.setItem(QS_KEY,JSON.stringify(a));}catch(e){}}
 
+/* ════ EXAM SPEC COVERAGE (Year 10/11) ════ */
+const SPEC_KEY='lf_spec_codes';       // topicId -> ['A1','N4',...]
+const SPEC_REF_KEY='lf_spec_reflist'; // raw pasted "CODE: description" lines
+function getSpecCodes(tid){try{return JSON.parse(localStorage.getItem(SPEC_KEY)||'{}')[tid]||[];}catch(e){return [];}}
+function saveSpecCodes(tid,codes){try{const a=JSON.parse(localStorage.getItem(SPEC_KEY)||'{}');a[tid]=codes;localStorage.setItem(SPEC_KEY,JSON.stringify(a));}catch(e){}}
+function getSpecRefList(){try{return localStorage.getItem(SPEC_REF_KEY)||'';}catch(e){return '';}}
+function saveSpecRefList(text){try{localStorage.setItem(SPEC_REF_KEY,text);}catch(e){}}
+function parseSpecRefList(){
+  return getSpecRefList().split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const idx=line.indexOf(':');
+    return idx>-1?{code:line.slice(0,idx).trim(),desc:line.slice(idx+1).trim()}:{code:line,desc:''};
+  });
+}
+function isExamYear(cls){return /year\s*1[01]\b/i.test(cls.name);}
+
+/* ════ INTERLEAVING & RETRIEVAL SPACING ════
+   Rule-based by default (no AI needed): surfaces already-taught topics
+   that haven't been revisited in a while, oldest-first. If a Claude key
+   is configured, an optional AI pass can re-prioritise the shortlist. */
+function computeInterleavingSuggestions(name,cw){
+  const candidates=[];
+  allCls().forEach(cls=>{
+    cls.topics.forEach(t=>{
+      if(t.end>=cw) return; // not taught-and-past yet
+      if(T[name]?.progress?.[t.id]?.status!=='taught') return;
+      const weeksSince=cw-t.end;
+      if(weeksSince<3) return; // too recent to need spacing yet
+      candidates.push({cls, topic:t, weeksSince});
+    });
+  });
+  candidates.sort((a,b)=>b.weeksSince-a.weeksSince);
+  return candidates.slice(0,5);
+}
+
+async function aiPrioritiseInterleaving(name,cw,btnEl){
+  const cfg=JSON.parse(localStorage.getItem('lf_cfg')||'{}');
+  if(cfg.provider!=='claude'||!cfg.apiKey){showToast('Add a Claude API key in Settings to use AI prioritisation.');return;}
+  const cands=computeInterleavingSuggestions(name,cw);
+  if(!cands.length){showToast('Nothing to prioritise yet.');return;}
+  if(btnEl){btnEl.textContent='⏳ Thinking...';btnEl.disabled=true;}
+  try{
+    const upcoming=allCls().flatMap(cls=>cls.topics.filter(t=>t.start>cw&&t.start<=cw+3).map(t=>t.name));
+    const list=cands.map((c,i)=>(i+1)+'. '+c.topic.name+' ('+c.cls.name+', taught '+c.weeksSince+'w ago)').join('\n');
+    const prompt='A UK secondary maths teacher taught these topics a while ago:\n'+list+
+      '\n\nComing up in the next 3 weeks: '+(upcoming.join(', ')||'nothing scheduled')+
+      '.\n\nWhich 2 of the already-taught topics would most benefit from a retrieval-practice refresh this week, given what\'s coming up? Reply with just the two numbers and a one-line reason each, nothing else.';
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({model:cfg.claudeModel||'claude-sonnet-4-20250514',max_tokens:200,messages:[{role:'user',content:prompt}]})
+    });
+    const d=await res.json();
+    const text=d.content&&d.content[0]?d.content[0].text:'';
+    const el=document.getElementById('interleave-ai-result');
+    if(el) el.innerHTML=`<div style="font-size:12px;color:var(--text2);white-space:pre-line;margin-top:8px;">${text.replace(/</g,'&lt;')}</div>`;
+  }catch(e){
+    showToast('❌ '+e.message);
+  }finally{
+    if(btnEl){btnEl.textContent='✨ Prioritise with AI';btnEl.disabled=false;}
+  }
+}
+
 async function generateQuestions(topicName,clsName,topicId,btnEl){
   if(btnEl){btnEl.textContent='\u23f3 Generating...';btnEl.classList.add('loading');btnEl.disabled=true;}
   try{
@@ -2411,6 +2473,41 @@ function removeTeacherFromRoster(name){
   renderRoster();
 }
 
+async function loadBackendTeachers(){
+  const el=document.getElementById('backend-teachers-list');
+  if(!el) return;
+  el.innerHTML='Loading…';
+  try{
+    const r=await fetch(API._url+'/api/auth/teachers',{headers:API.headers()});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Could not load teachers');
+    if(!d.teachers||!d.teachers.length){el.innerHTML='No accounts found yet.';return;}
+    el.innerHTML=d.teachers.map(t=>{
+      const roleBadge=t.role==='hod'?'<span style="font-size:9px;background:rgba(0,212,173,.15);color:var(--teal);padding:1px 6px;border-radius:8px;font-weight:700;">HoD</span>':'';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:13px;font-weight:600;">${t.name}</span>${roleBadge}</div>
+          <div style="font-size:11px;color:var(--text2);">${t.email} · joined ${new Date(t.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>
+        </div>
+        ${t.role!=='hod'?`<button onclick="deactivateTeacher('${t.id}','${t.name.replace(/'/g,"\\'")}')" class="btn" style="font-size:11px;color:var(--red);flex-shrink:0;">Deactivate</button>`:'<span style="font-size:10px;color:var(--text3);flex-shrink:0;">You</span>'}
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML='<span style="color:var(--red);">❌ '+e.message+'</span>';
+  }
+}
+
+async function deactivateTeacher(id,name){
+  if(!confirm('Remove '+name+"'s account? They'll no longer be able to sign in, but their progress data stays on record. This can't be undone.")) return;
+  try{
+    const r=await fetch(API._url+'/api/auth/teacher/'+id,{method:'DELETE',headers:API.headers()});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||'Could not remove teacher');
+    showToast('✓ '+name+"'s account removed.");
+    loadBackendTeachers();
+  }catch(e){showToast('❌ '+e.message);}
+}
+
 function renderRoster(){
   const co=document.getElementById('content');
   co.style.overflowY='auto';
@@ -2429,6 +2526,15 @@ function renderRoster(){
       </div>
       <button onclick="document.getElementById('add-teacher-form').style.display='block';this.style.display='none';" class="btna btn" style="font-size:12px;">+ Add teacher</button>
     </div>
+
+    ${isHoD()&&API.configured()?`
+    <div style="background:var(--panel2);border-radius:10px;padding:12px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:700;">Backend accounts <span style="font-size:10px;font-weight:400;color:var(--text3);">(real logins — invited or joined by code)</span></div>
+        <button onclick="loadBackendTeachers()" class="btn" style="font-size:11px;">↻ Load</button>
+      </div>
+      <div id="backend-teachers-list" style="font-size:12px;color:var(--text3);">Click Load to fetch the current list from your school's backend.</div>
+    </div>`:''}
 
     <!-- Add teacher form -->
     <div id="add-teacher-form" style="display:none;background:var(--panel);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:16px;">
@@ -2962,6 +3068,24 @@ function renderToday(){
     </div>
   </div>`:'';
 
+  // ── Interleaving / spaced retrieval suggestions ──
+  const interleaveCands=computeInterleavingSuggestions(U,cw);
+  const _aiCfg=JSON.parse(localStorage.getItem('lf_cfg')||'{}');
+  const hasClaudeKey=_aiCfg.provider==='claude'&&_aiCfg.apiKey;
+  const interleaveHTML=interleaveCands.length?`<div class="tv-interv" style="border-color:rgba(108,86,245,.25);background:rgba(108,86,245,.05);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <div class="tv-interv-msg" style="color:var(--acc);">🔁 Worth revisiting: ${interleaveCands.length} topic${interleaveCands.length!==1?'s':''} taught 3+ weeks ago</div>
+      ${hasClaudeKey?`<button onclick="aiPrioritiseInterleaving('${escAttr(U)}',${cw},this)" class="btn" style="font-size:11px;">✨ Prioritise with AI</button>`:''}
+    </div>
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+      ${interleaveCands.map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;background:var(--panel);border-radius:8px;">
+        <span style="font-size:12px;">${c.topic.name} <span style="color:var(--text3);">· ${c.cls.name} · taught ${c.weeksSince}w ago</span></span>
+        <button onclick="generateQuestions('${escAttr(c.topic.name)}','${escAttr(c.cls.name)}','${c.topic.id}',this)" class="btn" style="font-size:11px;flex-shrink:0;">🔄 Generate questions</button>
+      </div>`).join('')}
+    </div>
+    <div id="interleave-ai-result"></div>
+  </div>`:'';
+
   // ── Progress snapshot ──
   const snapRows=classes.map(cls=>{
     const p2=pct(U,cls);
@@ -3016,6 +3140,7 @@ function renderToday(){
 
     <!-- Intervention strip -->
     ${intervHTML}
+    ${interleaveHTML}
 
     <!-- Progress snapshot -->
     <div class="tv-snapshot">
@@ -3320,6 +3445,44 @@ function wksAhead(name,cls,cw){
   if(!lastT) return 0;
   if(lastT.end>pl.end) return lastT.end-pl.end;
   return 0;
+}
+
+/* Teacher-to-teacher parity: how far apart are co-teachers on the same class? */
+function furthestTaught(name,cls){
+  const taught=cls.topics.filter(t=>T[name]?.progress?.[t.id]?.status==='taught');
+  if(!taught.length) return null;
+  return taught.reduce((a,b)=>b.end>a.end?b:a);
+}
+function computeParity(cls){
+  const all=Ts().filter(n=>{const a=getAssign()[n];return !a||a.includes(cls.id);});
+  if(all.length<2) return null;
+  const rows=all.map(name=>{
+    const ft=furthestTaught(name,cls);
+    return {name, weekReached: ft?ft.end:0, topicName: ft?ft.name:'Not yet started'};
+  }).sort((a,b)=>b.weekReached-a.weekReached);
+  const gap=rows[0].weekReached-rows[rows.length-1].weekReached;
+  return {rows, gap};
+}
+
+/* Term-by-term blocks — inferred from date gaps in PD.weekDates.
+   Consecutive teaching weeks are normally exactly 7 days apart; any
+   larger gap means a holiday sits between them, i.e. a term/half-term
+   boundary, without needing any separate "term" data structure. */
+function getTermBlocks(){
+  const weeks=Object.keys(PD.weekDates).map(Number).sort((a,b)=>a-b);
+  if(!weeks.length) return [];
+  const blocks=[]; let current=[weeks[0]];
+  for(let i=1;i<weeks.length;i++){
+    const prevDate=new Date(PD.weekDates[String(weeks[i-1])]);
+    const thisDate=new Date(PD.weekDates[String(weeks[i])]);
+    const diffDays=Math.round((thisDate-prevDate)/(1000*60*60*24));
+    if(diffDays>9){ blocks.push(current); current=[weeks[i]]; }
+    else current.push(weeks[i]);
+  }
+  if(current.length) blocks.push(current);
+  return blocks.map((ws,i)=>({
+    label:'Term '+(i+1), weeks:ws, start:ws[0], end:ws[ws.length-1]
+  }));
 }
 
 /* ════ ACTIONS ════ */
@@ -4100,9 +4263,29 @@ function renderGanttSection(){
     </div>`;
   }
 
+  /* Parity banner — how far apart are co-teachers on this same class? */
+  let parityBanner='';
+  const parity=computeParity(cls);
+  if(parity&&parity.gap>=2){
+    const leader=parity.rows[0], trailer=parity.rows[parity.rows.length-1];
+    const meInvolved=parity.rows.some(r=>r.name===U);
+    if(meInvolved){
+      const meRow=parity.rows.find(r=>r.name===U);
+      const aheadOfMe=meRow.name!==leader.name;
+      parityBanner=`<div style="margin:6px 12px 0;padding:9px 12px;background:rgba(74,144,224,.06);border:1px solid rgba(74,144,224,.25);border-radius:9px;flex-shrink:0;display:flex;align-items:flex-start;gap:8px;">
+        <span style="font-size:15px;flex-shrink:0;">👥</span>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;">${aheadOfMe?`You're ${parity.gap}w behind ${leader.name}`:`You're ${parity.gap}w ahead of ${trailer.name}`}</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.5;">${leader.name} has reached <strong>${leader.topicName}</strong>${trailer.name!==leader.name?`; ${trailer.name} is at <strong>${trailer.topicName}</strong>`:''} on ${cls.name}. Worth a quick sync before assessments.</div>
+        </div>
+      </div>`;
+    }
+  }
+
   const html=`<div id="gwrap">
     ${actionBanner}
-    <div id="dhead" style="margin-top:${actionBanner?'6':'0'}px;">
+    ${parityBanner}
+    <div id="dhead" style="margin-top:${(actionBanner||parityBanner)?'6':'0'}px;">
       <div class="dh-stub">
         <span style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);flex:1;"># TOPIC</span>
         <span style="font-size:9px;color:var(--text3);">ST</span>
@@ -4995,6 +5178,7 @@ function render(){
     <div class="stair-tool${YID==='__strands'?' on':''}" onclick="YID='__strands';DASH=false;render();">🗂 <span>Topic strands</span></div>
     <div class="stair-tool${YID==='__calendar'?' on':''}" onclick="YID='__calendar';DASH=false;render();">🗓 <span>School calendar</span></div>
     <div class="stair-tool${YID==='__slt'?' on':''}" onclick="YID='__slt';DASH=false;render();">🏫 <span>SLT report</span></div>
+    <div class="stair-tool${YID==='__specs'?' on':''}" onclick="YID='__specs';DASH=false;render();">📋 <span>Spec coverage</span></div>
     <div class="stair-div" style="margin:6px 10px;"></div>
     <div class="stair-tool${YID==='__add'?' on':''}" onclick="goY('__add')" style="color:var(--acc);">⚙ <span>Settings</span></div>
     <div class="stair-tool" onclick="MODAL=true;render()">👤 <span style="color:${U?'var(--teal)':'var(--text2)'};">${U||'Set your name'}</span></div>
@@ -5074,6 +5258,7 @@ function render(){
   if(YID==='__digest'){ renderWeeklyDigest(); return; }
   if(YID==='__calendar'){ renderCalendar(); return; }
   if(YID==='__slt'){ renderSLT(); return; }
+  if(YID==='__specs'){ renderSpecCoverage(); return; }
   const cls=getCls(YID);
   if(!cls){ document.getElementById('content').innerHTML=''; return; }
 
@@ -5088,6 +5273,7 @@ function render(){
     ['analytics','📈 Analytics',''],
     ['behind',`⚠ Behind`,behindCt?`<span class="vt-badge" style="background:var(--red);">${behindCt}</span>`:''],
     ['upcoming','⏭ Upcoming',upcomingCt?`<span class="vt-badge" style="background:var(--amber);">${upcomingCt}</span>`:''],
+    ['termly','🗓 Termly',''],
   ].map(([id,lbl,badge])=>`<button class="vt${VIEW===id?' on':''}" onclick="setView('${id}')">${lbl}${badge}</button>`).join('');
 
   // Show/hide scope bar (gantt only)
@@ -5116,6 +5302,7 @@ function render(){
   else if(VIEW==='analytics') renderAnalytics(cls);
   else if(VIEW==='behind') renderBehind(cls);
   else if(VIEW==='upcoming') renderUpcoming(cls);
+  else if(VIEW==='termly') renderTermly(cls);
 
   // Slide animation — only animate direction changes, not tab switches
   if(SLIDE_DIR){
@@ -5335,6 +5522,103 @@ function renderUpcoming(cls){
         </div>`:''}
       </div>`;
     }).join('')}
+  </div>`;
+}
+
+/* ════ TERMLY OVERVIEW ════ */
+function renderTermly(cls){
+  if(!cls) return;
+  const cw=getCW(),tn=viewTs(cls.id);
+  const co=document.getElementById('content');
+  co.style.overflowY='auto';
+  const blocks=getTermBlocks();
+  if(!blocks.length){co.innerHTML=`<div class="page"><div class="card gray" style="padding:20px;text-align:center;color:var(--text2);">Set up your School Calendar first so LessonFlow can work out term boundaries.</div></div>`;return;}
+  co.innerHTML=`<div class="page">
+    <div style="font-size:17px;font-weight:700;margin-bottom:2px;">Termly overview · ${cls.name}</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px;">Weeks grouped by term/half-term, based on your School Calendar</div>
+    ${blocks.map(block=>{
+      const topicsInTerm=cls.topics.filter(t=>t.start<=block.end&&t.end>=block.start);
+      const isCurrent=cw>=block.start&&cw<=block.end;
+      const isPast=block.end<cw;
+      const teacherPcts=tn.map(name=>{
+        const relevant=topicsInTerm;
+        const done=relevant.filter(t=>T[name]?.progress?.[t.id]?.status==='taught').length;
+        return {name, pct: relevant.length?Math.round(done/relevant.length*100):0};
+      });
+      return `<div style="background:var(--panel);border:1px solid ${isCurrent?'var(--acc)':'var(--border)'};border-radius:10px;margin-bottom:12px;overflow:hidden;">
+        <div style="padding:10px 14px;background:${isCurrent?'rgba(108,86,245,.08)':'var(--panel2)'};display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+          <div>
+            <div style="font-size:14px;font-weight:700;">${block.label}${isCurrent?' · Current':''}</div>
+            <div style="font-size:11px;color:var(--text3);">Weeks ${block.start}–${block.end} · ${wLabel(block.start)} – ${wLabel(block.end)} · ${topicsInTerm.length} topic${topicsInTerm.length!==1?'s':''}</div>
+          </div>
+          ${isPast?`<span class="pill" style="background:var(--panel3);color:var(--text3);">Past</span>`:isCurrent?`<span class="pill" style="background:rgba(108,86,245,.15);color:var(--acc);">In progress</span>`:`<span class="pill" style="background:var(--panel3);color:var(--text3);">Upcoming</span>`}
+        </div>
+        <div style="padding:10px 14px;">
+          ${topicsInTerm.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${tn.length?'10':'0'}px;">
+            ${topicsInTerm.map(t=>`<span class="pill" style="background:var(--panel2);color:var(--text2);">${t.name} (W${t.start}${t.end!==t.start?'–'+t.end:''})</span>`).join('')}
+          </div>`:`<div style="font-size:12px;color:var(--text3);">No topics scheduled this term.</div>`}
+          ${tn.length&&topicsInTerm.length?teacherPcts.map(({name,pct})=>`
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span style="font-size:11px;color:var(--text2);width:90px;flex-shrink:0;">${ini(name)} ${name}</span>
+              <div style="flex:1;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${pct>=80?'var(--teal)':pct>=40?'var(--amber)':'var(--red)'};"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:32px;text-align:right;">${pct}%</span>
+            </div>`).join(''):''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+/* ════ EXAM SPEC COVERAGE ════ */
+function renderSpecCoverage(){
+  const co=document.getElementById('content');
+  co.style.overflowY='auto';
+  const examClasses=allCls().filter(isExamYear);
+  const ref=parseSpecRefList();
+  const editable=isHoD();
+
+  // Union of every spec code actually tagged on a topic, across exam-year classes
+  const covered=new Set();
+  examClasses.forEach(cls=>cls.topics.forEach(t=>getSpecCodes(t.id).forEach(c=>covered.add(c.toUpperCase()))));
+  const gaps=ref.filter(r=>r.code&&!covered.has(r.code.toUpperCase()));
+
+  co.innerHTML=`<div class="page">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+      <button onclick="goBack()" class="btn" style="font-size:12px;">← Back</button>
+      <div style="font-size:17px;font-weight:700;">📋 Exam Spec Coverage</div>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Year 10/11 only — checks your curriculum against your exam board's specification.</div>
+
+    ${examClasses.length?'':`<div class="card gray" style="padding:16px;text-align:center;color:var(--text2);margin-bottom:16px;">No Year 10 or 11 classes found yet.</div>`}
+
+    <div style="background:var(--panel);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Specification reference list</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Paste your exam board's spec, one point per line, as <code>CODE: description</code> — e.g. <code>A1: Use standard notation</code>. LessonFlow doesn't ship with any spec content built in; this is exactly what you paste in.</div>
+      ${editable?`
+      <textarea id="spec-ref-textarea" class="sfield" style="width:100%;min-height:120px;font-size:12px;font-family:monospace;" placeholder="A1: Use and interpret algebraic notation&#10;N4: Use the four operations with integers...">${getSpecRefList()}</textarea>
+      <button onclick="saveSpecRefList(document.getElementById('spec-ref-textarea').value);showToast('✓ Reference list saved');renderSpecCoverage();" class="btna btn" style="font-size:12px;margin-top:8px;">💾 Save reference list</button>
+      `:`<div style="font-size:12px;color:var(--text3);">${ref.length} spec point${ref.length!==1?'s':''} on file. Ask your HoD to edit this.</div>`}
+    </div>
+
+    ${ref.length?`<div style="background:${gaps.length?'rgba(255,79,110,.06)':'rgba(0,212,173,.06)'};border:1px solid ${gaps.length?'rgba(255,79,110,.25)':'rgba(0,212,173,.2)'};border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px;color:${gaps.length?'var(--red)':'var(--teal)'};">${gaps.length?`⚠ ${gaps.length} spec point${gaps.length!==1?'s':''} not yet tagged to any topic`:'✓ Every spec point is tagged to at least one topic'}</div>
+      ${gaps.length?`<div style="display:flex;flex-wrap:wrap;gap:6px;">${gaps.map(g=>`<span class="pill" style="background:var(--panel2);color:var(--red);" title="${g.desc}">${g.code}</span>`).join('')}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px;">This means no topic in a Year 10/11 class has this code tagged below — it may still be taught, just not recorded here yet.</div>`:''}
+    </div>`:''}
+
+    ${examClasses.map(cls=>`
+      <div style="margin-bottom:18px;">
+        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${cls.name}</div>
+        ${cls.topics.map(t=>{
+          const codes=getSpecCodes(t.id);
+          return `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;">
+            <span style="font-size:12px;flex:1;min-width:0;">${t.name} <span style="color:var(--text3);">(W${t.start}${t.end!==t.start?'–'+t.end:''})</span></span>
+            ${editable?`<input class="sfield" style="width:200px;font-size:11px;" placeholder="e.g. A1, N4" value="${codes.join(', ')}"
+              onchange="saveSpecCodes('${t.id}',this.value.split(',').map(x=>x.trim()).filter(Boolean));renderSpecCoverage();">`
+              :`<span style="font-size:11px;color:var(--text3);">${codes.length?codes.join(', '):'No codes tagged'}</span>`}
+          </div>`;
+        }).join('')}
+      </div>`).join('')}
   </div>`;
 }
 
