@@ -1768,11 +1768,6 @@ function showHelp(){
 (function(){
   // Snapshot original classes before SoL overrides them
   window._PD_CLASSES_ORIG=JSON.stringify(PD.classes);
-  // If no user set → trigger setup wizard immediately
-  if(!U){
-    SETUP=true;
-    SETUP_STEP=1;
-  }
   // Academic year start date (default: first Monday of September)
   if(!PD.startDate){
     const yr=new Date().getFullYear();
