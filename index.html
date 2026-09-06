@@ -102,9 +102,10 @@ input:focus{border-color:var(--acc)}
 .slide-in-right{animation:slideFromRight .22s cubic-bezier(.16,1,.3,1) both}
 .slide-in-left{animation:slideFromLeft .22s cubic-bezier(.16,1,.3,1) both}
 
-/* ═══ VIEW TABS (Gantt / Analytics / Behind / Upcoming) ═══ */
-#view-tabs{height:36px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 4px;flex-shrink:0;gap:1px}
-.vt{padding:0 13px;border:none;background:none;font-size:12px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:5px}
+/* ═══ VIEW TABS (Gantt / Analytics / Behind / Upcoming / Termly) ═══ */
+#view-tabs{height:36px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 4px;flex-shrink:0;gap:1px;overflow-x:auto;scrollbar-width:none}
+#view-tabs::-webkit-scrollbar{display:none}
+.vt{padding:0 13px;border:none;background:none;font-size:12px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:5px;flex-shrink:0}
 .vt:hover{color:var(--text)}
 .vt.on{color:var(--text);border-bottom-color:var(--acc);font-weight:500}
 .vt-badge{border-radius:10px;padding:1px 5px;font-size:10px;line-height:1.4;color:#fff}
@@ -1456,6 +1457,55 @@ const API = {
     return data;
   },
 
+  async changePassword(currentPassword, newPassword) {
+    const r = await fetch(this._url + '/api/auth/change-password', {
+      method: 'PATCH', headers: this.headers(),
+      body: JSON.stringify({currentPassword, newPassword})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not change password');
+    return data;
+  },
+
+  async resetTeacherPassword(teacherId) {
+    const r = await fetch(this._url + '/api/auth/teacher/' + teacherId + '/reset-password', {
+      method: 'POST', headers: this.headers()
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not reset password');
+    return data;
+  },
+
+  async forgotPassword(url, email) {
+    const r = await fetch(url.replace(/\/+$/,'') + '/api/auth/forgot-password', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not request a reset');
+    return data;
+  },
+
+  async resetPasswordWithToken(url, token, newPassword) {
+    const r = await fetch(url.replace(/\/+$/,'') + '/api/auth/reset-password', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({token, newPassword})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not reset password');
+    return data;
+  },
+
+  async notifyMe(subject, html) {
+    const r = await fetch(this._url + '/api/auth/notify-me', {
+      method: 'POST', headers: this.headers(),
+      body: JSON.stringify({subject, html})
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Could not send email');
+    return data;
+  },
+
   // Push local state to server (called after every setSts/savNoteTyped)
   async push(name) {
     if (!this.configured()) return;
@@ -1840,7 +1890,37 @@ function showHelp(){
   document.body.appendChild(m);
 }
 
+function renderPasswordResetScreen(token){
+  const ov=document.getElementById('setup-overlay');
+  if(!ov) return;
+  ov.style.display='flex';
+  ov.innerHTML=`<div style="max-width:400px;margin:80px auto;padding:24px;">
+    <div style="font-size:28px;font-weight:800;margin-bottom:6px;text-align:center;">🔒 Reset your password</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;text-align:center;">Choose a new password below.</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Backend URL</div>
+    <input id="reset-url" class="sfield" placeholder="https://lessonflow-api-xxxx.railway.app"
+      value="${localStorage.getItem('lf_api_url')||''}" style="width:100%;margin-bottom:10px;font-size:12px;">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">New password</div>
+    <input id="reset-pw" class="sfield" type="password" placeholder="min 8 characters" style="width:100%;margin-bottom:16px;font-size:14px;">
+    <button class="btna btn" style="width:100%;font-size:14px;font-weight:700;padding:12px;" onclick="(async()=>{
+      const url=document.getElementById('reset-url').value.trim();
+      const pw=document.getElementById('reset-pw').value;
+      if(!url||!pw){showToast('Fill in both fields');return;}
+      if(pw.length<8){showToast('Password must be 8+ characters');return;}
+      try{
+        await API.resetPasswordWithToken(url,'${token}',pw);
+        showToast('✓ Password reset — sign in with your new password.');
+        setTimeout(()=>{location.href=location.origin+location.pathname;},1200);
+      }catch(e){showToast('❌ '+e.message);}
+    })();">Set new password →</button>
+    <button onclick="location.href=location.origin+location.pathname;" style="width:100%;background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;margin-top:12px;">← Back to LessonFlow</button>
+  </div>`;
+}
+
 (function(){
+  // Password reset links land here as ?reset=TOKEN — handle before anything else
+  const _resetToken=new URLSearchParams(location.search).get('reset');
+  if(_resetToken){ renderPasswordResetScreen(_resetToken); return; }
   // Snapshot original classes before SoL overrides them
   window._PD_CLASSES_ORIG=JSON.stringify(PD.classes);
   // Academic year start date (default: first Monday of September)
@@ -2431,11 +2511,12 @@ function renderWeeklyDigest(){
   });
   const behindT=rows.filter(r=>r.behind.length), aheadT=rows.filter(r=>r.ahead.length), withNotes=rows.filter(r=>r.notes.length);
   const interventions=Object.values(getInterventions());
-  co.innerHTML=`<div style="max-width:700px;margin:0 auto;padding:20px;">
+  co.innerHTML=`<div style="max-width:700px;margin:0 auto;padding:20px;" id="digest-emailable">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
       <button onclick="goBack()" class="btn" style="font-size:12px;">← Back</button>
       <div style="font-size:17px;font-weight:700;">📋 Weekly Digest — W${cw}</div>
-      <button onclick="window.print()" class="btn" style="font-size:11px;margin-left:auto;">🖨 Print</button>
+      ${API.configured()?`<button onclick="emailThisPage('digest-emailable','📋 Weekly Digest — Week ${cw}')" class="btn" style="font-size:11px;">📧 Email me this</button>`:''}
+      <button onclick="window.print()" class="btn" style="font-size:11px;">🖨 Print</button>
     </div>
     <div style="font-size:12px;color:var(--text2);margin-bottom:18px;">${PD.term} · ${wLabel(cw)} · ${tn.length} teacher${tn.length!==1?'s':''} · ${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">
@@ -2473,6 +2554,19 @@ function removeTeacherFromRoster(name){
   renderRoster();
 }
 
+async function emailThisPage(elId,subject){
+  const el=document.getElementById(elId);
+  if(!el){showToast('Nothing to email.');return;}
+  // Strip interactive controls (buttons, inputs) from the emailed copy — only the content matters
+  const clone=el.cloneNode(true);
+  clone.querySelectorAll('button,input,textarea,select').forEach(x=>x.remove());
+  const html='<div style="font-family:Arial,sans-serif;">'+clone.innerHTML+'</div>';
+  try{
+    await API.notifyMe(subject,html);
+    showToast('✓ Sent to your email');
+  }catch(e){showToast('❌ '+e.message);}
+}
+
 async function loadBackendTeachers(){
   const el=document.getElementById('backend-teachers-list');
   if(!el) return;
@@ -2484,17 +2578,30 @@ async function loadBackendTeachers(){
     if(!d.teachers||!d.teachers.length){el.innerHTML='No accounts found yet.';return;}
     el.innerHTML=d.teachers.map(t=>{
       const roleBadge=t.role==='hod'?'<span style="font-size:9px;background:rgba(0,212,173,.15);color:var(--teal);padding:1px 6px;border-radius:8px;font-weight:700;">HoD</span>':'';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;">
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;flex-wrap:wrap;">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:13px;font-weight:600;">${t.name}</span>${roleBadge}</div>
           <div style="font-size:11px;color:var(--text2);">${t.email} · joined ${new Date(t.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>
         </div>
-        ${t.role!=='hod'?`<button onclick="deactivateTeacher('${t.id}','${t.name.replace(/'/g,"\\'")}')" class="btn" style="font-size:11px;color:var(--red);flex-shrink:0;">Deactivate</button>`:'<span style="font-size:10px;color:var(--text3);flex-shrink:0;">You</span>'}
+        ${t.role!=='hod'?`<button onclick="resetTeacherPasswordUI('${t.id}','${t.name.replace(/'/g,"\\'")}')" class="btn" style="font-size:11px;flex-shrink:0;">🔑 Reset password</button>
+        <button onclick="deactivateTeacher('${t.id}','${t.name.replace(/'/g,"\\'")}')" class="btn" style="font-size:11px;color:var(--red);flex-shrink:0;">Deactivate</button>`:'<span style="font-size:10px;color:var(--text3);flex-shrink:0;">You</span>'}
       </div>`;
     }).join('');
   }catch(e){
     el.innerHTML='<span style="color:var(--red);">❌ '+e.message+'</span>';
   }
+}
+
+async function resetTeacherPasswordUI(id,name){
+  if(!confirm("Reset "+name+"'s password? Their old password will stop working immediately.")) return;
+  try{
+    const d=await API.resetTeacherPassword(id);
+    if(d.emailed){
+      showToast('✓ '+name+"'s password was reset and emailed to them.");
+    }else{
+      alert(name+"'s new temporary password is:\n\n"+d.password+"\n\nEmail isn't set up for this school, so please relay this to them directly (e.g. in person or via your own email) — it won't be shown again.");
+    }
+  }catch(e){showToast('❌ '+e.message);}
 }
 
 async function deactivateTeacher(id,name){
@@ -5559,7 +5666,7 @@ function renderTermly(cls){
           </div>`:`<div style="font-size:12px;color:var(--text3);">No topics scheduled this term.</div>`}
           ${tn.length&&topicsInTerm.length?teacherPcts.map(({name,pct})=>`
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-              <span style="font-size:11px;color:var(--text2);width:90px;flex-shrink:0;">${ini(name)} ${name}</span>
+              <span style="font-size:11px;color:var(--text2);width:90px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ini(name)} ${name}</span>
               <div style="flex:1;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${pct>=80?'var(--teal)':pct>=40?'var(--amber)':'var(--red)'};"></div></div>
               <span style="font-size:11px;color:var(--text3);width:32px;text-align:right;">${pct}%</span>
             </div>`).join(''):''}
@@ -5611,9 +5718,9 @@ function renderSpecCoverage(){
         <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${cls.name}</div>
         ${cls.topics.map(t=>{
           const codes=getSpecCodes(t.id);
-          return `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;">
-            <span style="font-size:12px;flex:1;min-width:0;">${t.name} <span style="color:var(--text3);">(W${t.start}${t.end!==t.start?'–'+t.end:''})</span></span>
-            ${editable?`<input class="sfield" style="width:200px;font-size:11px;" placeholder="e.g. A1, N4" value="${codes.join(', ')}"
+          return `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;margin-bottom:5px;flex-wrap:wrap;">
+            <span style="font-size:12px;flex:1;min-width:160px;">${t.name} <span style="color:var(--text3);">(W${t.start}${t.end!==t.start?'–'+t.end:''})</span></span>
+            ${editable?`<input class="sfield" style="width:160px;max-width:100%;font-size:11px;" placeholder="e.g. A1, N4" value="${codes.join(', ')}"
               onchange="saveSpecCodes('${t.id}',this.value.split(',').map(x=>x.trim()).filter(Boolean));renderSpecCoverage();">`
               :`<span style="font-size:11px;color:var(--text3);">${codes.length?codes.join(', '):'No codes tagged'}</span>`}
           </div>`;
@@ -5659,14 +5766,15 @@ function renderSLT(){
     </div>`;
   }).join('');
 
-  co.innerHTML=`<div style="max-width:960px;margin:0 auto;padding:20px;">
+  co.innerHTML=`<div style="max-width:960px;margin:0 auto;padding:20px;" id="slt-emailable">
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
       <div>
         <div style="display:flex;align-items:center;gap:10px;"><button onclick="goBack()" class="btn" style="font-size:12px;">← Back</button><span style="font-size:22px;font-weight:800;letter-spacing:-.3px;">SLT Overview</span></div>
         <div style="font-size:13px;color:var(--text2);">${PD.term} · Week ${cw} · ${wLabel(cw)} · Read-only</div>
       </div>
-      <div style="display:flex;gap:10px;align-items:center;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <button onclick="exportSLTReport()" class="btna btn" style="font-size:12px;">📊 Export SLT Report</button>
+        ${API.configured()?`<button onclick="emailThisPage('slt-emailable','SLT Overview — Week ${cw}')" class="btn" style="font-size:12px;">📧 Email me this</button>`:''}
         <div style="text-align:right;">
           <div style="font-size:32px;font-weight:900;color:${alignCol2};line-height:1;">${alignPct2!==null?alignPct2+'%':'–'}</div>
           <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);">Dept alignment</div>
@@ -5860,7 +5968,7 @@ function renderAddCls(){
         <div style="background:var(--panel2);border-radius:10px;padding:14px;margin-bottom:10px;">
           <div style="font-size:13px;font-weight:700;margin-bottom:12px;">Connect to your school's backend</div>
 
-          <div id="api-mode" style="display:flex;gap:6px;margin-bottom:14px;">
+          <div id="api-mode" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
             <button onclick="document.getElementById('api-login-form').style.display='block';document.getElementById('api-register-form').style.display='none';document.getElementById('api-invite-form').style.display='none';" class="btn" style="font-size:11px;font-weight:700;">Sign in</button>
             <button onclick="document.getElementById('api-register-form').style.display='block';document.getElementById('api-login-form').style.display='none';document.getElementById('api-invite-form').style.display='none';" class="btn" style="font-size:11px;">Register school (HoD)</button>
             <button onclick="document.getElementById('api-invite-form').style.display='block';document.getElementById('api-login-form').style.display='none';document.getElementById('api-register-form').style.display='none';" class="btn" style="font-size:11px;">Join with code (Teacher)</button>
@@ -5899,6 +6007,20 @@ function renderAddCls(){
                 render();
               }catch(e){showToast('❌ '+e.message);}
             })();">Sign in →</button>
+            <button onclick="document.getElementById('forgot-pw-form').style.display='block';this.style.display='none';" style="width:100%;background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;margin-top:8px;text-decoration:underline;">Forgot your password?</button>
+            <div id="forgot-pw-form" style="display:none;margin-top:10px;padding:10px;background:var(--panel3);border-radius:8px;">
+              <div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Enter your email — if password reset by email is set up for your school, you'll get a reset link. Otherwise, ask your HoD to reset it from Teacher Roster.</div>
+              <input id="forgot-pw-email" class="sfield" type="email" placeholder="you@school.ac.uk" style="width:100%;margin-bottom:8px;font-size:12px;">
+              <button class="btn" style="width:100%;font-size:12px;" onclick="(async()=>{
+                const url=document.getElementById('api-url-input').value.trim();
+                const email=document.getElementById('forgot-pw-email').value.trim();
+                if(!url||!email){showToast('Enter your email first');return;}
+                try{
+                  const d=await API.forgotPassword(url,email);
+                  showToast('✓ '+(d.message||'Check your email for a reset link.'));
+                }catch(e){showToast('❌ '+e.message);}
+              })();">Send reset link</button>
+            </div>
           </div>
 
           <!-- REGISTER FORM (HoD) -->
@@ -5995,6 +6117,26 @@ function renderAddCls(){
             else showToast('No code found for this school yet.');
           }catch(e){showToast('❌ '+e.message);}
         })();">↻ Fetch my code</button>`:''}
+      </div>`:''}
+      ${API.configured()?`
+      <div class="sec-l">Change my password</div>
+      <div style="background:var(--panel2);border-radius:10px;padding:12px;margin-bottom:14px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Current password</div>
+        <input id="pw-current" class="sfield" type="password" style="width:100%;margin-bottom:8px;font-size:12px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">New password</div>
+        <input id="pw-new" class="sfield" type="password" placeholder="min 8 characters" style="width:100%;margin-bottom:10px;font-size:12px;">
+        <button class="btna btn" style="width:100%;font-size:12px;" onclick="(async()=>{
+          const cur=document.getElementById('pw-current').value;
+          const nw=document.getElementById('pw-new').value;
+          if(!cur||!nw){showToast('Fill in both fields');return;}
+          if(nw.length<8){showToast('New password must be 8+ characters');return;}
+          try{
+            await API.changePassword(cur,nw);
+            showToast('✓ Password changed');
+            document.getElementById('pw-current').value='';
+            document.getElementById('pw-new').value='';
+          }catch(e){showToast('❌ '+e.message);}
+        })();">🔒 Update password</button>
       </div>`:''}
       <!-- HoD: Invite a teacher -->
       ${isHoD()?`
