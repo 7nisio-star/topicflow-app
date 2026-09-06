@@ -5088,11 +5088,10 @@ function render(){
   }
   if(canViewDept()){
     if(MODAL) renderModal();
-    if(DASH){renderDashboard();return;}
+    if(DASH&&VIEW==='gantt'){renderDashboard();return;}
   } else if(SIMPLE_MODE){
     if(MODAL) renderModal();
-    renderToday();
-    return;
+    if(VIEW==='gantt'){renderToday();return;}
   }
   if(VIEW==='todo') renderTodo();
   else if(!cls){/* no class selected, show placeholder */
@@ -5830,7 +5829,7 @@ function renderSetup(){
         <div style="background:var(--panel2);border:1px solid var(--border2);border-radius:10px;padding:16px;margin-bottom:12px;">
           <div style="font-size:12px;font-weight:700;margin-bottom:8px;">Your name</div>
           <input class="sfield" id="guest-name" placeholder="e.g. Ms Smith or Mr Patel"
-            value="${U||''}"
+            value="${SETUP_DATA.guestName||U||''}"
             oninput="SETUP_DATA.guestName=this.value"
             onkeydown="if(event.key==='Enter')setupAuth()">
         </div>
@@ -6101,6 +6100,11 @@ function finishSetup(){
   SETUP=false;
   document.getElementById('setup-overlay').style.display='none';
   if(!U) MODAL=true;
+  // Match the same role-based mode split used after an API sign-in, so a
+  // HoD who never connects a backend still gets the full Department view
+  // instead of the plain teacher-style card layout.
+  if(isHoD()){SIMPLE_MODE=false;localStorage.setItem('lf_simple','0');DASH=true;}
+  else{SIMPLE_MODE=true;localStorage.setItem('lf_simple','1');}
   YID=PD.classes[0]?.id||'y7';
   render();
 }
