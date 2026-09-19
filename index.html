@@ -749,556 +749,10 @@ function escAttr(str){return String(str||'').replace(/['"<>\\]/g,'_');}
 
 /* ════ PLAN DATA ════ */
 const PD={
-  term: 'Academic Year 2026/27 — Trinity Academy Leeds',
+  term: 'Academic Year 2026/27',
   weeks: 40,
   startDate: '2026-09-01',
-  classes: [
-  {
-    "id": "year_7",
-    "name": "Year 7",
-    "color": "#6c56f5",
-    "topics": [
-      {
-        "id": "year7_t1",
-        "name": "7.1 Sequences",
-        "start": 2,
-        "end": 3
-      },
-      {
-        "id": "year7_t2",
-        "name": "7.2 Algebraic notation & substitution",
-        "start": 4,
-        "end": 5
-      },
-      {
-        "id": "year7_t3",
-        "name": "7.3 Expressions & equations",
-        "start": 6,
-        "end": 7
-      },
-      {
-        "id": "year7_t4",
-        "name": "7.4 Place value, ordering & rounding",
-        "start": 8,
-        "end": 9
-      },
-      {
-        "id": "year7_t5",
-        "name": "7.5 Four operations",
-        "start": 10,
-        "end": 11
-      },
-      {
-        "id": "year7_t6",
-        "name": "7.6 Averages & range",
-        "start": 12,
-        "end": 13
-      },
-      {
-        "id": "year7_t7",
-        "name": "7.7 Rounding & estimation",
-        "start": 14,
-        "end": 14
-      },
-      {
-        "id": "year7_t8",
-        "name": "7.8 Graphing data",
-        "start": 15,
-        "end": 17
-      },
-      {
-        "id": "year7_t9",
-        "name": "7.9 Fractions, decimals & percentages",
-        "start": 18,
-        "end": 21
-      },
-      {
-        "id": "year7_t10",
-        "name": "7.10 Directed number",
-        "start": 22,
-        "end": 23
-      },
-      {
-        "id": "year7_t11",
-        "name": "7.11 Fractions & percentages of amounts",
-        "start": 24,
-        "end": 25
-      },
-      {
-        "id": "year7_t12",
-        "name": "7.12 Perimeter & area",
-        "start": 26,
-        "end": 27
-      },
-      {
-        "id": "year7_t13",
-        "name": "7.13 Speed, distance & time",
-        "start": 28,
-        "end": 30
-      },
-      {
-        "id": "year7_t14",
-        "name": "7.14 Properties of numbers",
-        "start": 31,
-        "end": 33
-      },
-      {
-        "id": "year7_t15",
-        "name": "7.15 Add & subtract fractions",
-        "start": 34,
-        "end": 36
-      },
-      {
-        "id": "year7_t16",
-        "name": "7.16 Angles in polygons",
-        "start": 37,
-        "end": 40
-      }
-    ]
-  },
-  {
-    "id": "year_8",
-    "name": "Year 8",
-    "color": "#00d4ad",
-    "topics": [
-      {
-        "id": "year8_t1",
-        "name": "8.1 Ratio",
-        "start": 2,
-        "end": 3
-      },
-      {
-        "id": "year8_t2",
-        "name": "8.2 Proportion & scale",
-        "start": 4,
-        "end": 5
-      },
-      {
-        "id": "year8_t3",
-        "name": "8.3 Algebraic manipulation",
-        "start": 6,
-        "end": 7
-      },
-      {
-        "id": "year8_t4",
-        "name": "8.4 Coordinates & graphs",
-        "start": 8,
-        "end": 10
-      },
-      {
-        "id": "year8_t5",
-        "name": "8.5 Multiply & divide fractions",
-        "start": 11,
-        "end": 14
-      },
-      {
-        "id": "year8_t6",
-        "name": "8.7 Area, volume & density",
-        "start": 15,
-        "end": 16
-      },
-      {
-        "id": "year8_t7",
-        "name": "8.8 Equations & inequalities",
-        "start": 17,
-        "end": 18
-      },
-      {
-        "id": "year8_t8",
-        "name": "8.9 Percentages",
-        "start": 19,
-        "end": 21
-      },
-      {
-        "id": "year8_t9",
-        "name": "8.10 Indices",
-        "start": 22,
-        "end": 23
-      },
-      {
-        "id": "year8_t10",
-        "name": "8.11 Standard form",
-        "start": 24,
-        "end": 25
-      },
-      {
-        "id": "year8_t11",
-        "name": "8.12 Interpret & represent data",
-        "start": 26,
-        "end": 27
-      },
-      {
-        "id": "year8_t12",
-        "name": "8.13 Angles in polygons",
-        "start": 28,
-        "end": 31
-      },
-      {
-        "id": "year8_t13",
-        "name": "8.14 Tables & probability",
-        "start": 32,
-        "end": 34
-      },
-      {
-        "id": "year8_t14",
-        "name": "8.15 Circles",
-        "start": 35,
-        "end": 36
-      },
-      {
-        "id": "year8_t15",
-        "name": "8.16 Charts & graphs",
-        "start": 37,
-        "end": 38
-      },
-      {
-        "id": "year8_t16",
-        "name": "8.17 Sequences",
-        "start": 39,
-        "end": 40
-      }
-    ]
-  },
-  {
-    "id": "year_9",
-    "name": "Year 9",
-    "color": "#f5564a",
-    "topics": [
-      {
-        "id": "year9_t1",
-        "name": "9.1 Properties of number",
-        "start": 2,
-        "end": 3
-      },
-      {
-        "id": "year9_t2",
-        "name": "9.2 Percentages",
-        "start": 4,
-        "end": 5
-      },
-      {
-        "id": "year9_t3",
-        "name": "9.3 Area & volume",
-        "start": 6,
-        "end": 7
-      },
-      {
-        "id": "year9_t4",
-        "name": "9.4 Equations, inequalities & formulae",
-        "start": 8,
-        "end": 9
-      },
-      {
-        "id": "year9_t5",
-        "name": "9.5 Fractions",
-        "start": 10,
-        "end": 10
-      },
-      {
-        "id": "year9_t6",
-        "name": "9.6 Rates",
-        "start": 11,
-        "end": 14
-      },
-      {
-        "id": "year9_t7",
-        "name": "9.7b Standard form",
-        "start": 15,
-        "end": 16
-      },
-      {
-        "id": "year9_t8",
-        "name": "9.9 Straight line graphs",
-        "start": 17,
-        "end": 18
-      },
-      {
-        "id": "year9_t9",
-        "name": "9.10 Ratio & proportion",
-        "start": 19,
-        "end": 20
-      },
-      {
-        "id": "year9_t10",
-        "name": "9.11 Construction & congruence",
-        "start": 21,
-        "end": 22
-      },
-      {
-        "id": "year9_t11",
-        "name": "9.12 Similarity",
-        "start": 23,
-        "end": 24
-      },
-      {
-        "id": "year9_t12",
-        "name": "9.13 Algebraic manipulation",
-        "start": 25,
-        "end": 26
-      },
-      {
-        "id": "year9_t13",
-        "name": "9.14 Pythagoras' Theorem",
-        "start": 27,
-        "end": 28
-      },
-      {
-        "id": "year9_t14",
-        "name": "9.15 Non-linear graphs",
-        "start": 29,
-        "end": 30
-      },
-      {
-        "id": "year9_t15",
-        "name": "9.16 Probability",
-        "start": 31,
-        "end": 32
-      },
-      {
-        "id": "year9_t16",
-        "name": "9.17 Transformations",
-        "start": 33,
-        "end": 34
-      },
-      {
-        "id": "year9_t17",
-        "name": "9.18a Simultaneous equations",
-        "start": 35,
-        "end": 36
-      },
-      {
-        "id": "year9_t18",
-        "name": "9.19a Trigonometry",
-        "start": 37,
-        "end": 40
-      }
-    ]
-  },
-  {
-    "id": "year_10_higher",
-    "name": "Year 10 (Higher)",
-    "color": "#f0b429",
-    "topics": [
-      {
-        "id": "year10higher_t1",
-        "name": "10.1 Algebraic manipulation",
-        "start": 2,
-        "end": 2
-      },
-      {
-        "id": "year10higher_t2",
-        "name": "10.2 Equations, inequalities & formulae",
-        "start": 3,
-        "end": 4
-      },
-      {
-        "id": "year10higher_t3",
-        "name": "10.3 Percentages",
-        "start": 5,
-        "end": 7
-      },
-      {
-        "id": "year10higher_t4",
-        "name": "10.4 Ratio & scale",
-        "start": 8,
-        "end": 9
-      },
-      {
-        "id": "year10higher_t5",
-        "name": "10.5 Quadratics",
-        "start": 10,
-        "end": 13
-      },
-      {
-        "id": "year10higher_t6",
-        "name": "10.5 Quadratic expressions",
-        "start": 14,
-        "end": 14
-      },
-      {
-        "id": "year10higher_t7",
-        "name": "10.6 Simultaneous equations",
-        "start": 15,
-        "end": 16
-      },
-      {
-        "id": "year10higher_t8",
-        "name": "10.7 Work with fractions",
-        "start": 17,
-        "end": 18
-      },
-      {
-        "id": "year10higher_t9",
-        "name": "10.8 Non-calculator methods",
-        "start": 19,
-        "end": 20
-      },
-      {
-        "id": "year10higher_t10",
-        "name": "10.9 Straight line graphs",
-        "start": 21,
-        "end": 22
-      },
-      {
-        "id": "year10higher_t11",
-        "name": "10.10 Probability",
-        "start": 23,
-        "end": 24
-      },
-      {
-        "id": "year10higher_t12",
-        "name": "10.11 Rounding",
-        "start": 25,
-        "end": 26
-      },
-      {
-        "id": "year10higher_t13",
-        "name": "10.12 Perimeter, area & vol",
-        "start": 27,
-        "end": 30
-      },
-      {
-        "id": "year10higher_t14",
-        "name": "10.13 Pythagoras & trigonometry",
-        "start": 31,
-        "end": 32
-      },
-      {
-        "id": "year10higher_t15",
-        "name": "10.13 Pythag & trig (cont.)",
-        "start": 33,
-        "end": 34
-      },
-      {
-        "id": "year10higher_t16",
-        "name": "10.14 Interpret & represent data",
-        "start": 35,
-        "end": 36
-      },
-      {
-        "id": "year10higher_t17",
-        "name": "10.15 Angles",
-        "start": 37,
-        "end": 38
-      },
-      {
-        "id": "year10higher_t18",
-        "name": "10.16 Graphs & diagrams",
-        "start": 39,
-        "end": 40
-      }
-    ]
-  },
-  {
-    "id": "year_10_foundation",
-    "name": "Year 10 (Foundation)",
-    "color": "#3b82f6",
-    "topics": [
-      {
-        "id": "year10foundation_t1",
-        "name": "10.1 Algebraic manipulation",
-        "start": 2,
-        "end": 3
-      },
-      {
-        "id": "year10foundation_t2",
-        "name": "10.2 Equations, inequalities & formulae",
-        "start": 4,
-        "end": 5
-      },
-      {
-        "id": "year10foundation_t3",
-        "name": "10.3 Percentages",
-        "start": 6,
-        "end": 7
-      },
-      {
-        "id": "year10foundation_t4",
-        "name": "10.4 Ratio & scale",
-        "start": 8,
-        "end": 9
-      },
-      {
-        "id": "year10foundation_t5",
-        "name": "10.5 Quadratics",
-        "start": 10,
-        "end": 13
-      },
-      {
-        "id": "year10foundation_t6",
-        "name": "10.5 Quadratic expressions",
-        "start": 14,
-        "end": 14
-      },
-      {
-        "id": "year10foundation_t7",
-        "name": "10.6 Simultaneous equations",
-        "start": 15,
-        "end": 16
-      },
-      {
-        "id": "year10foundation_t8",
-        "name": "10.7 Work with fractions",
-        "start": 17,
-        "end": 20
-      },
-      {
-        "id": "year10foundation_t9",
-        "name": "10.9 Straight line graphs",
-        "start": 21,
-        "end": 22
-      },
-      {
-        "id": "year10foundation_t10",
-        "name": "10.10 Probability",
-        "start": 23,
-        "end": 24
-      },
-      {
-        "id": "year10foundation_t11",
-        "name": "10.11 Rounding",
-        "start": 25,
-        "end": 26
-      },
-      {
-        "id": "year10foundation_t12",
-        "name": "10.12 Perimeter, area & vol",
-        "start": 27,
-        "end": 30
-      },
-      {
-        "id": "year10foundation_t13",
-        "name": "10.13 Pythagoras & trigonometry",
-        "start": 31,
-        "end": 32
-      },
-      {
-        "id": "year10foundation_t14",
-        "name": "10.13 Pythag & trig (cont.)",
-        "start": 33,
-        "end": 34
-      },
-      {
-        "id": "year10foundation_t15",
-        "name": "10.14 Interpret & represent data",
-        "start": 35,
-        "end": 36
-      },
-      {
-        "id": "year10foundation_t16",
-        "name": "10.15 Angles",
-        "start": 37,
-        "end": 38
-      },
-      {
-        "id": "year10foundation_t17",
-        "name": "10.16 Graphs & diagrams",
-        "start": 39,
-        "end": 40
-      }
-    ]
-  }
-]
+  classes: [],
 };
 const TK='lf16t', UK='lf16u', CK='lf16c';
 const CFG_KEY='lf_cfg';   // AI provider config
@@ -1315,7 +769,7 @@ let PLAYBACK=false; let PLAYBACK_WEEK=1; // timeline playback
 
 /* ─── UI STATE ─── */
 let T={}, U=null, CUSTOM=[];
-let YID='y7';          // selected year group id
+let YID='__add';          // selected year group id
 let SCOPE='this';      // 'this' | 'all'
 let VIEW='checkin';    // 'checkin' | 'gantt' | 'analytics' | 'behind' | 'upcoming' | 'todo'
 let DASH=true;         // true = dashboard home
@@ -1398,8 +852,14 @@ function checkExpiry(){
    to the server. Falls back to localStorage if offline.
    Backend: https://github.com/dmventures/lessonflow-api
 ═══════════════════════════════════════════════════════════ */
+// The one hosted backend this app talks to. Not a secret — just an
+// address — so there's no reason to make anyone type or paste it.
+// Kept as a named constant (rather than scattered inline) so a future
+// re-deploy only needs updating in one place.
+const DEFAULT_API_URL = 'https://lessonflow-api-production.up.railway.app';
+
 const API = {
-  _url: localStorage.getItem('lf_api_url') || '',
+  _url: localStorage.getItem('lf_api_url') || DEFAULT_API_URL,
   _tok: localStorage.getItem('lf_api_token') || '',
 
   configured() { return !!(this._url && this._tok); },
@@ -1890,6 +1350,50 @@ function showHelp(){
   document.body.appendChild(m);
 }
 
+/* ════ PAYWALL ════
+   A platform admin can lock a whole school (HoD + all its teachers) via
+   the separate admin panel. Checked at boot and refreshed after every
+   sign-in/join, since the flag can change any time from outside this app. */
+function storePaywallFlag(enabled){
+  try{ localStorage.setItem('lf_paywall', enabled ? '1' : '0'); }catch(e){}
+}
+function isPaywalled(){
+  try{ return localStorage.getItem('lf_paywall')==='1'; }catch(e){ return false; }
+}
+function renderPaywallLockScreen(){
+  const ov=document.getElementById('setup-overlay');
+  if(!ov) return;
+  ov.style.display='flex';
+  ov.innerHTML=`<div style="max-width:420px;margin:100px auto;padding:24px;text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">🔒</div>
+    <div style="font-size:22px;font-weight:800;margin-bottom:10px;">Access paused</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px;">
+      Your school's LessonFlow access is currently paused. This usually means a subscription or billing issue —
+      contact your HoD or LessonFlow support to get this sorted out.
+    </div>
+    <button class="btn" style="font-size:12px;" onclick="(async()=>{
+      try{
+        const r=await fetch(API._url+'/api/auth/me',{headers:API.headers()});
+        const d=await r.json();
+        storePaywallFlag(!!d.paywall_enabled);
+        if(!d.paywall_enabled){location.reload();}
+        else showToast('Still paused — try again in a moment.');
+      }catch(e){showToast('❌ '+e.message);}
+    })();">↻ Check again</button>
+  </div>`;
+}
+// Re-checks the paywall flag against the server and updates the lock
+// screen accordingly — call this after any sign-in/join success.
+async function refreshPaywallCheck(){
+  if(!API.configured()) return;
+  try{
+    const r=await fetch(API._url+'/api/auth/me',{headers:API.headers()});
+    const d=await r.json();
+    storePaywallFlag(!!d.paywall_enabled);
+    if(d.paywall_enabled) renderPaywallLockScreen();
+  }catch(e){ /* offline or server issue — fall back to the last-known local flag */ }
+}
+
 function renderPasswordResetScreen(token){
   const ov=document.getElementById('setup-overlay');
   if(!ov) return;
@@ -1897,9 +1401,7 @@ function renderPasswordResetScreen(token){
   ov.innerHTML=`<div style="max-width:400px;margin:80px auto;padding:24px;">
     <div style="font-size:28px;font-weight:800;margin-bottom:6px;text-align:center;">🔒 Reset your password</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:20px;text-align:center;">Choose a new password below.</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Backend URL</div>
-    <input id="reset-url" class="sfield" placeholder="https://lessonflow-api-xxxx.railway.app"
-      value="${localStorage.getItem('lf_api_url')||''}" style="width:100%;margin-bottom:10px;font-size:12px;">
+    <input id="reset-url" type="hidden" value="${localStorage.getItem('lf_api_url')||DEFAULT_API_URL}">
     <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">New password</div>
     <input id="reset-pw" class="sfield" type="password" placeholder="min 8 characters" style="width:100%;margin-bottom:16px;font-size:14px;">
     <button class="btna btn" style="width:100%;font-size:14px;font-weight:700;padding:12px;" onclick="(async()=>{
@@ -1921,6 +1423,10 @@ function renderPasswordResetScreen(token){
   // Password reset links land here as ?reset=TOKEN — handle before anything else
   const _resetToken=new URLSearchParams(location.search).get('reset');
   if(_resetToken){ renderPasswordResetScreen(_resetToken); return; }
+  // A platform admin may have paused this school since the last visit —
+  // show the lock screen immediately from the cached flag, then verify
+  // against the server in the background.
+  if(isPaywalled()){ renderPaywallLockScreen(); setTimeout(refreshPaywallCheck,0); return; }
   // Snapshot original classes before SoL overrides them
   window._PD_CLASSES_ORIG=JSON.stringify(PD.classes);
   // Academic year start date (default: first Monday of September)
@@ -2009,6 +1515,23 @@ function savT(){
 function getEffectiveWeek(){ return PLAYBACK?PLAYBACK_WEEK:getCW(); }
 function savU(){try{localStorage.setItem(UK,U);}catch(e){}}
 function savC(){try{localStorage.setItem(CK,JSON.stringify(CUSTOM));}catch(e){}}
+
+// Signs out of this account and clears local identity — but keeps
+// curriculum/progress data on this device untouched, unlike Clear All Data
+// in Danger Zone, which wipes everything.
+function logout(){
+  const wasConnected=API.configured();
+  if(!confirm(wasConnected?'Log out? You can sign back in anytime with your email and password.':'Switch user? This clears your name so someone else can use this device.')) return;
+  try{
+    API.setConfig('','');
+    localStorage.removeItem(UK);
+    localStorage.removeItem('lf_role');
+    localStorage.removeItem('lf_school_code');
+    localStorage.removeItem('lf_paywall');
+    localStorage.removeItem('lf_simple');
+  }catch(e){}
+  location.reload();
+}
 
 /* ════ ROLE & PERMISSIONS ═══════════════════════════════
    Role stored in lf_role: 'hod' | 'teacher'
@@ -3034,6 +2557,19 @@ function renderToday(){
     return;
   }
 
+  if(!classes.length){
+    co.style.overflowY='auto';
+    co.innerHTML=`<div style="max-width:420px;margin:60px auto;padding:24px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:14px;">📋</div>
+      <div style="font-size:19px;font-weight:800;margin-bottom:8px;">Nothing loaded yet</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;">
+        Your department hasn't got any classes or topics set up yet — ask your HoD to upload a scheme of work or add some classes, and they'll appear here automatically.
+      </div>
+      ${API.configured()?`<button onclick="(async()=>{showToast('Checking for updates…');await API.pullScheme();render();})();" class="btn" style="font-size:12px;margin-top:16px;">↻ Check again</button>`:''}
+    </div>`;
+    return;
+  }
+
   // ── Compute status across all classes ──
   const behindClasses=classes.filter(cls=>wksBehind(U,cls,cw)>0);
   const aheadClasses=classes.filter(cls=>wksAhead(U,cls,cw)>0);
@@ -3683,7 +3219,7 @@ function togGap(name,tid,type){
 }
 
 function clearScheme(){
-  if(!confirm('Clear the uploaded scheme of work and return to the built-in Maths curriculum?\n\n✓ Teacher progress data is kept\n✗ Uploaded topics and custom classes will be removed')) return;
+  if(!confirm('Clear the uploaded scheme of work and return to a blank curriculum?\n\n✓ Teacher progress data is kept\n✗ Uploaded topics and custom classes will be removed')) return;
   // Remove all scheme-related storage
   try{localStorage.removeItem(SOL_KEY);}catch(e){}
   try{localStorage.removeItem(STRAND_KEY);}catch(e){}
@@ -3700,11 +3236,11 @@ function clearScheme(){
   SETUP_DATA.parsedClasses=null;
   SETUP_DATA.fileName='';
   SETUP_DATA.fileObj=null;
-  // Reset YID to first valid class
-  YID=PD.classes[0]?.id||'y7';
+  // Reset YID to first valid class, or the Add-class screen if there are none
+  YID=PD.classes[0]?.id||'__add';
   VIEW='gantt';
   DASH=true;
-  showToast('✓ Scheme cleared — using built-in curriculum');
+  showToast('✓ Scheme cleared');
   render();
 }
 function clrMe(){if(!U||!confirm('Clear your progress?'))return;T[U]={name:U,progress:{},gaps:[]};savT();render();}
@@ -4927,7 +4463,7 @@ function renderDashboard(){
 
   // Personal welcome
   let welcomeHTML='';
-  if(U){
+  if(U && classes.length){
     const myBehindCls=classes.filter(cls=>wksBehind(U,cls,cw)>0);
     const myAheadCls=classes.filter(cls=>wksAhead(U,cls,cw)>0);
     let msg;
@@ -5005,7 +4541,7 @@ function renderDashboard(){
   co.style.overflowY='auto';
   co.innerHTML=`<div id="dash-wrap"><div id="stuck-bar" style="display:none;margin-bottom:8px;"></div>
     <div class="dash-header">
-      ${!isHoD()&&U?`<div onclick="DASH=false;VIEW='checkin';YID=allCls()[0]?.id||'y7';render()"
+      ${!isHoD()&&U?`<div onclick="DASH=false;VIEW='checkin';YID=allCls()[0]?.id||'__add';render()"
         style="background:linear-gradient(135deg,var(--acc),#5a42d4);border-radius:12px;padding:13px 16px;margin-bottom:14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;user-select:none;">
         <div>
           <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:2px;">✓ Update your progress</div>
@@ -5037,7 +4573,16 @@ function renderDashboard(){
       </div>`:''}
     </div>
     ${welcomeHTML}
-    <div class="dash-grid">${tileHTML}</div>
+    ${classes.length?`<div class="dash-grid">${tileHTML}</div>`:`
+    <div style="max-width:480px;margin:40px auto;text-align:center;padding:32px 24px;background:var(--panel);border:1px solid var(--border2);border-radius:14px;">
+      <div style="font-size:36px;margin-bottom:10px;">📋</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;">No classes yet</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px;">This department is starting completely blank. Upload a scheme of work to get topics loaded automatically, or add your first class by hand.</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button onclick="if(confirm('Re-run setup to upload a scheme of work? Your progress data will be kept.')){SETUP=true;SETUP_STEP=3;SETUP_DATA.parsedClasses=null;SETUP_DATA.fileName='';renderSetup();}" class="btna btn" style="font-size:12px;">📂 Upload a scheme of work</button>
+        <button onclick="YID='__add';DASH=false;render();" class="btn" style="font-size:12px;">+ Add a class by hand</button>
+      </div>
+    </div>`}
   </div>`;
 }
 
@@ -5347,6 +4892,17 @@ function render(){
     void co.offsetWidth; // force reflow
     co.classList.add('slide-in-left');
     if(MODAL) renderModal(); else document.getElementById('mslot').innerHTML='';
+    return;
+  }
+
+  // A classless teacher has no valid YID to resolve to a real class at
+  // all, so the normal per-class dispatch below can never be reached —
+  // catch this case explicitly and show Today's own empty state.
+  if(SIMPLE_MODE&&!isHoD()&&!classes.length){
+    document.getElementById('view-tabs').style.display='none';
+    document.getElementById('scope-bar').style.display='none';
+    document.getElementById('stair-sb').classList.add('hidden');
+    renderToday();
     return;
   }
 
@@ -5852,7 +5408,7 @@ function renderHoD(){
               <div style="font-size:11px;color:var(--text3);">${t.totalBehind>0?`${t.totalBehind}w behind · `:''} ${t.totalOverdue} overdue · ${t.avgPct}% taught</div>
             </div>
           </div>
-          ${action?`<button onclick="U='${t.name}';goY(allCls()[0]?.id||'y7');" class="btn" style="font-size:11px;">${action}</button>`:''}
+          ${action?`<button onclick="U='${t.name}';goY(allCls()[0]?.id||'__add');" class="btn" style="font-size:11px;">${action}</button>`:''}
         </div>`).join('')}
       </div>
     </div>`:''
@@ -5958,15 +5514,17 @@ function renderAddCls(){
       <div id="api-status-bar" style="margin-bottom:10px;"></div>
       <div id="api-section">
         ${API.configured()?`
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(0,212,173,.08);border:1px solid rgba(0,212,173,.2);border-radius:10px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(0,212,173,.08);border:1px solid rgba(0,212,173,.2);border-radius:10px;margin-bottom:10px;flex-wrap:wrap;">
           <span style="font-size:16px;">✓</span>
-          <div style="flex:1;font-size:12px;color:var(--teal);font-weight:600;">Connected to API</div>
+          <div style="flex:1;font-size:12px;color:var(--teal);font-weight:600;">Connected to API${U?' as '+U:''}</div>
           <button onclick="API.setConfig('','');showToast('Disconnected');render();" class="btn" style="font-size:11px;color:var(--red);">Disconnect</button>
+          <button onclick="logout()" class="btn" style="font-size:11px;color:var(--red);">🚪 Log out</button>
         </div>
         <button onclick="(async()=>{const d=await API.pull();if(d){showToast('✓ Synced '+Object.keys(d.T||{}).length+' teachers');render();}else showToast('Sync failed');})();" class="btn" style="font-size:12px;margin-bottom:8px;">↻ Sync now</button>
         `:`
         <div style="background:var(--panel2);border-radius:10px;padding:14px;margin-bottom:10px;">
           <div style="font-size:13px;font-weight:700;margin-bottom:12px;">Connect to your school's backend</div>
+          ${U?`<button onclick="logout()" class="btn" style="font-size:11px;color:var(--red);float:right;margin-top:-2px;">🚪 Log out</button>`:''}
 
           <div id="api-mode" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
             <button onclick="document.getElementById('api-login-form').style.display='block';document.getElementById('api-register-form').style.display='none';document.getElementById('api-invite-form').style.display='none';" class="btn" style="font-size:11px;font-weight:700;">Sign in</button>
@@ -5974,12 +5532,19 @@ function renderAddCls(){
             <button onclick="document.getElementById('api-invite-form').style.display='block';document.getElementById('api-login-form').style.display='none';document.getElementById('api-register-form').style.display='none';" class="btn" style="font-size:11px;">Join with code (Teacher)</button>
           </div>
 
-          <!-- API URL (shared) -->
-          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Backend URL</div>
-          <input id="api-url-input" class="sfield" placeholder="https://lessonflow-api-xxxx.railway.app"
-            value="${localStorage.getItem('lf_api_url_draft')||''}"
-            style="width:100%;margin-bottom:12px;font-size:12px;"
-            oninput="localStorage.setItem('lf_api_url_draft',this.value)">
+          <!-- API URL (shared) — defaults to our one hosted backend; hidden
+               behind Advanced since almost nobody needs to change it -->
+          <div id="api-url-summary" style="font-size:11px;color:var(--text3);margin-bottom:12px;">
+            Using LessonFlow's hosted backend.
+            <span onclick="document.getElementById('api-url-wrap').style.display='block';document.getElementById('api-url-summary').style.display='none';" style="color:var(--acc);cursor:pointer;text-decoration:underline;">Advanced: use a different backend</span>
+          </div>
+          <div id="api-url-wrap" style="display:none;">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Backend URL</div>
+            <input id="api-url-input" class="sfield" placeholder="https://lessonflow-api-xxxx.railway.app"
+              value="${localStorage.getItem('lf_api_url_draft')||localStorage.getItem('lf_api_url')||DEFAULT_API_URL}"
+              style="width:100%;margin-bottom:12px;font-size:12px;"
+              oninput="localStorage.setItem('lf_api_url_draft',this.value)">
+          </div>
 
           <!-- SIGN IN FORM -->
           <div id="api-login-form">
@@ -5998,6 +5563,8 @@ function renderAddCls(){
                 U=d.user.name; savU();
                 setRole(d.user.role);
                 if(d.join_code){try{localStorage.setItem('lf_school_code',d.join_code);}catch(e){}}
+                storePaywallFlag(!!d.paywall_enabled);
+                if(d.paywall_enabled){renderPaywallLockScreen();return;}
                 showToast('\u2713 Signed in as '+d.user.name);
                 await API.pullScheme();
                 await API.pull();
@@ -6048,6 +5615,7 @@ function renderAddCls(){
                 U=d.user.name; savU();
                 setRole('hod');
                 if(d.join_code){try{localStorage.setItem('lf_school_code',d.join_code);}catch(e){}}
+                storePaywallFlag(!!d.paywall_enabled);
                 showToast('✓ School registered! Your teacher join code is '+d.join_code+' — share it with your team.');
                 render();
               }catch(e){showToast('❌ '+e.message);}
@@ -6078,6 +5646,8 @@ function renderAddCls(){
                 const d=await API.joinWithCode(code,name,email,pw);
                 U=d.user.name; savU();
                 setRole(d.user.role||'teacher');
+                storePaywallFlag(!!d.paywall_enabled);
+                if(d.paywall_enabled){renderPaywallLockScreen();return;}
                 showToast('\u2713 Joined '+(d.school_name||'your school')+'! Loading curriculum...');
                 // Show loading state immediately
                 const _co=document.getElementById('co');
@@ -6332,11 +5902,16 @@ function renderSetup(){
           </div>
           ${SETUP_DATA.joinMode==='code'?`
           <div style="font-size:11px;color:var(--text2);margin-bottom:10px;padding:8px;background:var(--panel3);border-radius:6px;">Ask your HoD for the school join code. Everyone who joins this way sees the same curriculum and syncs together.</div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Backend URL</div>
-          <input class="sfield" id="wiz-join-url" placeholder="https://lessonflow-api-xxxx.railway.app"
-            value="${localStorage.getItem('lf_api_url_draft')||localStorage.getItem('lf_api_url')||''}"
-            style="width:100%;margin-bottom:8px;font-size:12px;"
-            oninput="localStorage.setItem('lf_api_url_draft',this.value)">
+          <div id="wiz-url-summary" style="font-size:10px;color:var(--text3);margin-bottom:8px;">
+            <span onclick="document.getElementById('wiz-url-wrap').style.display='block';document.getElementById('wiz-url-summary').style.display='none';" style="color:var(--acc);cursor:pointer;text-decoration:underline;">Advanced: use a different backend</span>
+          </div>
+          <div id="wiz-url-wrap" style="display:none;">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Backend URL</div>
+            <input class="sfield" id="wiz-join-url" placeholder="https://lessonflow-api-xxxx.railway.app"
+              value="${localStorage.getItem('lf_api_url_draft')||localStorage.getItem('lf_api_url')||DEFAULT_API_URL}"
+              style="width:100%;margin-bottom:8px;font-size:12px;"
+              oninput="localStorage.setItem('lf_api_url_draft',this.value)">
+          </div>
           <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">School code</div>
           <input class="sfield" id="wiz-join-code" placeholder="e.g. K7P3QX"
             value="${SETUP_DATA.wizJoinCode||''}"
@@ -6437,7 +6012,7 @@ function renderSetup(){
     bodyHTML=`
       <h2 style="font-size:22px;font-weight:800;margin-bottom:6px;">Upload your scheme of work</h2>
       <p style="color:var(--text2);font-size:13px;margin-bottom:20px;">
-        ${hasAI?`<strong style="color:var(--teal);">AI will read your document</strong> and extract year groups, topics and durations automatically.`:'Your AI key isn\'t configured — you can still upload and edit manually, or skip to use the built-in curriculum.'}
+        ${hasAI?`<strong style="color:var(--teal);">AI will read your document</strong> and extract year groups, topics and durations automatically.`:'Your AI key isn\'t configured — you can still upload and edit manually, or skip and start blank.'}
       </p>
 
       ${SETUP_DATA.processing?`
@@ -6506,7 +6081,7 @@ function renderSetup(){
         ${parsed?'Review extracted topics':'Ready to launch'}
       </h2>
       <p style="color:var(--text2);font-size:13px;margin-bottom:20px;">
-        ${parsed?`Found ${parsed.length} year group${parsed.length!==1?'s':''} in your document. Check the topics look right before saving.`:'Using the built-in Maths 2025/26 curriculum. You can upload your own scheme later via Settings.'}
+        ${parsed?`Found ${parsed.length} year group${parsed.length!==1?'s':''} in your document. Check the topics look right before saving.`:'Starting with a blank curriculum — add your classes and topics in Edit Curriculum once you\'re in, or upload a scheme of work anytime from Settings.'}
       </p>
 
       ${parsed?parsed.map((cls,ci)=>`
@@ -6535,7 +6110,7 @@ function renderSetup(){
           </div>
         </div>`).join(''):
         `<div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:13px;color:var(--text2);">
-          ✓ Built-in curriculum: Year 7–13 Maths, 40-week year, topics pre-loaded.
+          📋 No topics loaded yet — you're starting completely blank. Add classes and topics in Edit Curriculum, or come back and upload a scheme of work anytime.
         </div>`}
 
       <div style="background:rgba(0,212,173,.07);border:1px solid rgba(0,212,173,.2);border-radius:10px;padding:14px;margin-top:8px;">
@@ -6596,6 +6171,12 @@ async function setupJoinWithCode(name){
     const d=await API.joinWithCode(code,name,email,pw);
     U=d.user.name; savU();
     setRole(d.user.role||'teacher');
+    storePaywallFlag(!!d.paywall_enabled);
+    if(d.paywall_enabled){
+      SETUP=false;
+      renderPaywallLockScreen();
+      return;
+    }
     showToast('\u2713 Joined '+(d.school_name||'your school')+'! Loading curriculum...');
     SETUP=false;
     const ov=document.getElementById('setup-overlay');
@@ -6648,7 +6229,7 @@ function finishSetup(){
   // instead of the plain teacher-style card layout.
   if(isHoD()){SIMPLE_MODE=false;localStorage.setItem('lf_simple','0');DASH=true;}
   else{SIMPLE_MODE=true;localStorage.setItem('lf_simple','1');}
-  YID=PD.classes[0]?.id||'y7';
+  YID=PD.classes[0]?.id||'__add';
   render();
 }
 
@@ -6741,7 +6322,7 @@ async function quickReadFile(){
     autoMapRows(rows);
   }catch(err){
     SETUP_DATA.processing=false;
-    showToast('Could not read file: '+err.message+'. Try Skip to use the built-in curriculum.');
+    showToast('Could not read file: '+err.message+'. Try Skip to start blank instead.');
     renderSetup();
   }
 }
@@ -7080,7 +6661,8 @@ function renderModal(){
         style="display:block;width:100%;font-size:14px;padding:10px;font-weight:600;">
         ${isNewUser?'Start tracking →':'Confirm name'}
       </button>
-      ${U?`<button onclick="MODAL=false;render();" class="btn" style="display:block;width:100%;margin-top:7px;font-size:12px;">Cancel</button>`:''}
+      ${U?`<button onclick="MODAL=false;render();" class="btn" style="display:block;width:100%;margin-top:7px;font-size:12px;">Cancel</button>
+      <button onclick="logout()" class="btn" style="display:block;width:100%;margin-top:7px;font-size:12px;color:var(--red);border-color:rgba(255,79,110,.3);">🚪 Log out</button>`:''}
     </div>
   </div>`;
 }
