@@ -823,11 +823,18 @@ function validateCls(arr){
   return arr.filter(cls=>{
     if(!cls||typeof cls!=='object') return false;
     if(!cls.id||!cls.name||!Array.isArray(cls.topics)) return false;
+    const hadTopics=cls.topics.length>0;
     cls.topics=cls.topics.filter(t=>
       t&&typeof t.id==='string'&&typeof t.name==='string'&&
       Number.isInteger(t.start)&&Number.isInteger(t.end)&&
       t.start>=1&&t.end<=Config.maxWeeks&&t.start<=t.end
     );
+    // A class that had topics but lost every single one to the filter
+    // above is corrupt data (e.g. all weeks out of range), not a
+    // legitimately empty class — drop it rather than importing a class
+    // with no topics at all. This only runs on uploaded/parsed scheme
+    // data (see call site), never on a freshly-added custom class.
+    if(hadTopics&&!cls.topics.length) return false;
     return true;
   });
 }
@@ -1127,6 +1134,43 @@ const API = {
       return scheme;
     } catch (e) {
       return null;
+    }
+  },
+
+  // Push the local curriculum (PD.classes) to the server so it reaches
+  // every teacher who syncs via join code. Without this, HoD edits to
+  // the curriculum (Curriculum Editor, "Add a custom class", or the
+  // setup wizard's uploaded scheme) never leave this device — teachers
+  // pulling via pullScheme() above would always get nothing back.
+  async pushScheme() {
+    if (!this.configured()) return false;
+    try {
+      const body = {
+        term: PD.term,
+        weeks: PD.weeks,
+        // allCls() = PD.classes + CUSTOM — a class added via "Add a
+        // custom class" lives only in CUSTOM, so PD.classes alone would
+        // silently drop it from what teachers receive.
+        classes: allCls().map(c => ({
+          id: c.id, name: c.name, color: c.color,
+          topics: (c.topics || []).map(t => ({
+            id: t.id, name: t.name, start_week: t.start, end_week: t.end
+          }))
+        }))
+      };
+      const r = await fetch(this._url + '/api/schemes', {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) {
+        console.warn('LessonFlow: pushScheme failed, status', r.status);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.warn('LessonFlow: pushScheme offline or failed —', e.message);
+      return false;
     }
   }
 };
@@ -1744,7 +1788,12 @@ function openCurricEditor(clsId){
 function renderCurricEditor(){
   const co=document.getElementById('content');
   co.style.overflowY='auto';
-  const cls=CE.cls||allCls()[0];
+  // Keep CE.cls in sync with what's actually shown — any caller that
+  // navigates here without going through openCurricEditor() (or after
+  // classes were cleared/re-added) would otherwise leave CE.cls stale or
+  // null, and ceAddTopic()/ceRelayout()/saveCurric() all read CE.cls
+  // directly without this fallback, so they'd throw on first use.
+  const cls=CE.cls=CE.cls||allCls()[0];
   if(!cls){co.innerHTML='<div style="padding:24px;color:var(--text2);">No class selected.</div>';return;}
 
   // Build 40-week grid
@@ -1911,18 +1960,29 @@ function ceRelayout(){
     t.end=ww-1; w=ww;
   });
 }
-function saveCurric(){
-  // Save back to PD.classes and persist
+async function saveCurric(){
+  // Save back to PD.classes (or CUSTOM — a class added via "Add a custom
+  // class" lives there instead, and CE.cls may be a direct reference into
+  // either array) and persist both.
   const cls=CE.cls;
   const idx=PD.classes.findIndex(c2=>c2.id===cls.id);
   if(idx>-1) PD.classes[idx]=cls;
+  const cIdx=CUSTOM.findIndex(c2=>c2.id===cls.id);
+  if(cIdx>-1) CUSTOM[cIdx]=cls;
   // Persist custom curriculum
   try{
     const sol=PD.classes.filter(c2=>c2._custom||CE.cls.id===c2.id);
     cls._custom=true;
     localStorage.setItem(SOL_KEY,JSON.stringify(sol));
   }catch(e){}
-  showToast('Curriculum saved and applied to all teacher pages.');
+  savC(); // persist CUSTOM (topic edits on a custom class only live here)
+  if(API.configured()){
+    showToast('Saving and syncing to your department...');
+    const ok=await API.pushScheme();
+    showToast(ok?'✓ Curriculum saved and synced to all teacher pages.':'⚠ Saved locally, but couldn\'t sync to the server — teachers won\'t see this yet.');
+  }else{
+    showToast('Curriculum saved on this device.');
+  }
   goY(cls.id);
 }
 function ceImportFromExcel(){
@@ -2513,7 +2573,7 @@ function runTests(){
 
   test('esc: sanitises XSS strings',()=>{
     assert('esc basic html','\u003cscript\u003e'.replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])),'&lt;script&gt;');
-    assert('escAttr strips quotes',escAttr('bad<>"name'),esc('bad<>"name'));
+    assert('escAttr strips quotes',escAttr('bad<>"name'),'bad___name');
   });
 
   T=savedT; // restore
@@ -3248,6 +3308,7 @@ function clearScheme(){
   DASH=canViewDept(); // only HoD/SLT land on the Department Dashboard
   showToast('✓ Scheme cleared');
   render();
+  if(API.configured()&&isHoD()) API.pushScheme(); // sync the cleared state to teachers
 }
 function clrMe(){if(!U||!confirm('Clear your progress?'))return;T[U]={name:U,progress:{},gaps:[]};savT();render();}
 function clrT(n){if(!confirm('Remove '+n+'?'))return;delete T[n];savT();render();}
@@ -4832,7 +4893,7 @@ function render(){
     <div class="stair-tool${YID==='__hod'?' on':''}" onclick="goY('__hod')">📈 <span>Department</span></div>
     <div class="stair-tool${YID==='__digest'?' on':''}" onclick="YID='__digest';DASH=false;render();">📋 <span>Weekly digest</span></div>
     <div class="stair-tool${YID==='__roster'?' on':''}" onclick="YID='__roster';DASH=false;render();">👥 <span>Teacher roster</span></div>
-    <div class="stair-tool${YID==='__curric'?' on':''}" onclick="YID='__curric';DASH=false;render();">📅 <span>Edit curriculum</span></div>
+    <div class="stair-tool${YID==='__curric'?' on':''}" onclick="openCurricEditor(YID&&YID!=='__curric'?YID:undefined)">📅 <span>Edit curriculum</span></div>
     <div class="stair-tool${YID==='__strands'?' on':''}" onclick="YID='__strands';DASH=false;render();">🗂 <span>Topic strands</span></div>
     <div class="stair-tool${YID==='__calendar'?' on':''}" onclick="YID='__calendar';DASH=false;render();">🗓 <span>School calendar</span></div>
     <div class="stair-tool${YID==='__slt'?' on':''}" onclick="YID='__slt';DASH=false;render();">🏫 <span>SLT report</span></div>
@@ -5568,6 +5629,12 @@ function renderAddCls(){
                 const d=await API.login(email,pw);
                 U=d.user.name; savU();
                 setRole(d.user.role);
+                // Mark setup as complete so the boot check (hasConfig) doesn't
+                // throw this account back into the full setup wizard on the
+                // next reload — this flag was previously only ever set by
+                // the wizard's own AI-provider step, which a direct sign-in
+                // never passes through.
+                setupSaveConfig();
                 if(d.join_code){try{localStorage.setItem('lf_school_code',d.join_code);}catch(e){}}
                 storePaywallFlag(!!d.paywall_enabled);
                 if(d.paywall_enabled){renderPaywallLockScreen();return;}
@@ -5652,6 +5719,7 @@ function renderAddCls(){
                 const d=await API.joinWithCode(code,name,email,pw);
                 U=d.user.name; savU();
                 setRole(d.user.role||'teacher');
+                setupSaveConfig(); // see note on the Sign In handler above
                 storePaywallFlag(!!d.paywall_enabled);
                 if(d.paywall_enabled){renderPaywallLockScreen();return;}
                 showToast('\u2713 Joined '+(d.school_name||'your school')+'! Loading curriculum...');
@@ -5789,6 +5857,7 @@ function addCC(){
   const cols=['#e05a8a','#4ad4e0','#e0a820','#8ae060'];
   CUSTOM.push({id:'cx_'+Date.now(),name:n.trim(),color:cols[CUSTOM.length%cols.length],topics:[]});
   savC();render();
+  if(API.configured()&&isHoD()) API.pushScheme();
 }
 
 /* ════════════════════════════════════════════════════════
@@ -6177,6 +6246,7 @@ async function setupJoinWithCode(name){
     const d=await API.joinWithCode(code,name,email,pw);
     U=d.user.name; savU();
     setRole(d.user.role||'teacher');
+    setupSaveConfig(); // see note on the Sign In handler above
     storePaywallFlag(!!d.paywall_enabled);
     if(d.paywall_enabled){
       SETUP=false;
@@ -6237,6 +6307,9 @@ function finishSetup(){
   else{SIMPLE_MODE=true;localStorage.setItem('lf_simple','1');}
   YID=PD.classes[0]?.id||'__add';
   render();
+  // Sync the uploaded/edited curriculum to the department, if connected.
+  // Fire-and-forget so setup completion doesn't wait on the network.
+  if(API.configured()&&isHoD()) API.pushScheme();
 }
 
 /* ── SSO stubs ── */
