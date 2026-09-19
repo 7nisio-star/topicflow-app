@@ -772,7 +772,7 @@ let T={}, U=null, CUSTOM=[];
 let YID='__add';          // selected year group id
 let SCOPE='this';      // 'this' | 'all'
 let VIEW='checkin';    // 'checkin' | 'gantt' | 'analytics' | 'behind' | 'upcoming' | 'todo'
-let DASH=true;         // true = dashboard home
+let DASH=false;        // true = dashboard home (set explicitly per-role at boot/sign-in, never assumed)
 let SETUP=false;       // setup wizard open
 let SETUP_STEP=1;      // 1–4
 let MODAL=false;       // name-entry modal
@@ -1473,7 +1473,7 @@ function renderPasswordResetScreen(token){
       if(e.key==='?'){showHelp();return;}
   if(e.key==='t'||e.key==='T'){SIMPLE_MODE=true;localStorage.setItem('lf_simple','1');render();}
       if(e.key==='g'||e.key==='G'){SIMPLE_MODE=false;localStorage.setItem('lf_simple','0');DASH=false;VIEW='gantt';render();}
-      if(e.key==='d'||e.key==='D'){SIMPLE_MODE=false;localStorage.setItem('lf_simple','0');DASH=true;render();}
+      if((e.key==='d'||e.key==='D')&&canViewDept()){SIMPLE_MODE=false;localStorage.setItem('lf_simple','0');DASH=true;render();}
     }
     if(e.key==='Escape'){closeDp();if(SETUP){SETUP=false;const _ov2=document.getElementById('setup-overlay');if(_ov2)_ov2.style.display='none';render();}}
   });
@@ -1482,6 +1482,12 @@ function renderPasswordResetScreen(token){
   const hasConfig=!!localStorage.getItem(CFG_KEY);
   if(!hasConfig){SETUP=true;SETUP_STEP=1;}
   else if(!U) MODAL=true;
+  // Returning HoD/SLT lands on the Department Dashboard by default;
+  // everyone else (a teacher reloading the app) goes to their own view.
+  // DASH now defaults to false, so this has to be set explicitly here —
+  // it used to be implicit via DASH's old `true` default, which meant
+  // teachers were also landing on the Dashboard on every reload/sign-in.
+  if(canViewDept()) DASH=true;
   render();
 })();
 
@@ -3131,7 +3137,7 @@ function getTermBlocks(){
 /* ════ ACTIONS ════ */
 function goY(id){YID=id;DASH=false;SLIDE_DIR='right';VIEW='gantt';closeDp();closeMobSb();render();}
 function setView(v){VIEW=v;closeDp();render();}
-function goHome(){DASH=true;SLIDE_DIR='left';closeDp();closeMobSb();render();}
+function goHome(){DASH=canViewDept();if(!DASH)VIEW='gantt';SLIDE_DIR='left';closeDp();closeMobSb();render();}
 function goBack(){
   // Context-aware back: utility/settings pages → return to dashboard
   const settingsPages=['__hod','__add','__curric','__roster','__calendar','__slt'];
@@ -3239,7 +3245,7 @@ function clearScheme(){
   // Reset YID to first valid class, or the Add-class screen if there are none
   YID=PD.classes[0]?.id||'__add';
   VIEW='gantt';
-  DASH=true;
+  DASH=canViewDept(); // only HoD/SLT land on the Department Dashboard
   showToast('✓ Scheme cleared');
   render();
 }
